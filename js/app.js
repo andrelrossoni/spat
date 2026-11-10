@@ -641,7 +641,7 @@ async function seed(){
 window.addEventListener("hashchange",()=>{window.scrollTo(0,0);render()});
 (async()=>{
   nav();
-  const info=await Store.init(); S.info=info;
+  let info; try{info=await Store.init()}catch(e){info={erro:"Não foi possível conectar à base",detalhe:`${e?.message||e}. ${dicaErro(e?.message)}`}} S.info=info;
   if(info.erro){$("view").innerHTML=vazio(info.erro,info.detalhe||"");return}
   if(info.precisaLogin){S.precisaLogin=true;render();return}
   S.me=info.me; S.readOnly=info.podeGravar===false;
