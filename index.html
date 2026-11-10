@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Gestão SPAT · Embrapa Agrossilvipastoril</title>
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="css/styles.css">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}[hidden]{display:none!important}img{max-width:100%}</style>
+</head>
+<body>
+<header class="topo"><div class="assin" id="assin"></div><div class="sist"><b>Sistema de Gestão do SPAT</b>Setor de Prospecção e Avaliação de Tecnologias</div></header>
+<div class="app">
+  <aside class="side"><nav class="nav" id="nav" aria-label="Navegação principal"></nav><div class="who" id="who"></div></aside>
+  <main class="main"><div class="wrap" id="view"><div class="empty"><h3>Carregando o Sistema SPAT…</h3><p>As informações aparecem assim que a conexão com a base for confirmada.</p></div></div></main>
+</div>
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script>
+<script src="js/marca.js"></script>
+<script src="js/catalogo.js"></script>
+<script src="js/export.js"></script>
+<script src="js/store-supabase.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
