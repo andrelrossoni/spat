@@ -5,6 +5,6 @@
    de segurança por linha (RLS) criadas pelo arquivo supabase/schema.sql.
    NUNCA coloque aqui a chave secreta (sb_secret_...) nem a service_role. */
 window.SPAT_CONFIG = {
-  supabaseUrl: "https://SEU-PROJETO.supabase.co",
-  supabaseKey: "COLE-AQUI-A-CHAVE-sb_publishable"
+  supabaseUrl: "https://mfhlcmkhxyazedealfrc.supabase.co",
+  supabaseKey: "sb_publishable_58Pkuk9zVRhQe3APUPeKJw_cyABge7G"
 };
