@@ -11,8 +11,9 @@ window.Store = (()=>{
     mode:"supabase",
     logoPadrao: C.logo || null,
     async init(){
-      if(!C.supabaseUrl||!C.supabaseAnonKey) return {erro:"Instalação incompleta",detalhe:"Preencha supabaseUrl e supabaseAnonKey no arquivo config.js, como descrito no README."};
-      sb = supabase.createClient(C.supabaseUrl, C.supabaseAnonKey);
+      const KEY=C.supabaseKey||C.supabaseAnonKey;
+      if(!C.supabaseUrl||!KEY||/COLE-AQUI|SEU-PROJETO/.test(C.supabaseUrl+KEY)) return {erro:"Instalação incompleta",detalhe:"Preencha supabaseUrl e supabaseKey no arquivo config.js, como descrito no README."};
+      sb = supabase.createClient(C.supabaseUrl, KEY);
       sb.auth.onAuthStateChange((ev)=>{ if(ev==="SIGNED_IN"&&!me) location.reload(); if(ev==="SIGNED_OUT") location.reload(); });
       const {data:{session}} = await sb.auth.getSession();
       if(!session) return {precisaLogin:true};

@@ -32,11 +32,12 @@ Esta versão roda como site estático no **GitHub Pages** e guarda os dados no *
 3. Em **Authentication → Providers → Email**, mantenha o login por e-mail ativo e a confirmação de e-mail ligada.
 4. Em **Authentication → URL Configuration**, informe em *Site URL* o endereço final do GitHub Pages
    (ex.: `https://ORGANIZACAO.github.io/gestao-spat/`).
-5. Em **Project Settings → API**, copie a *Project URL* e a chave *anon public*.
+5. Em **Settings → API Keys**, copie a *Project URL* e a chave **publicável** (`sb_publishable_...`).
+   As chaves legadas *anon* estão sendo descontinuadas pelo Supabase até o fim de 2026.
 
 ### 2. Repositório no GitHub
 1. Crie um repositório (ex.: `gestao-spat`) e envie todos os arquivos desta pasta, incluindo `.github/` e `.nojekyll`.
-2. Edite `config.js` com a URL e a chave *anon* do passo anterior.
+2. Edite `config.js` com a URL e a chave publicável do passo anterior.
 3. Em **Settings → Pages**, escolha *Source: GitHub Actions*.
 4. Cada envio para a branch `main` publica o sistema. O endereço aparece na aba **Actions**.
 
@@ -47,12 +48,12 @@ Esta versão roda como site estático no **GitHub Pages** e guarda os dados no *
    em **Cadastros**.
 
 ## Segurança
-- A chave *anon* é pública por desenho do Supabase. O que protege os dados são as regras de `schema.sql`:
+- A chave publicável é pública por desenho do Supabase. O que protege os dados são as regras de `schema.sql`:
   - ninguém escolhe o próprio perfil ou se aprova (gatilho `proteger_perfil`);
   - solicitantes leem e alteram apenas as próprias demandas;
   - membros, supervisor e chefias veem todas as demandas;
   - só o supervisor altera configurações, aprova cadastros e exclui demandas.
-- Nunca coloque a chave *service_role* no repositório.
+- Nunca coloque a chave secreta (`sb_secret_...`) ou *service_role* no repositório.
 - Para uso institucional com dados sigilosos de PI e contratos, avalie com a área de TI da Embrapa
   a hospedagem em infraestrutura corporativa. O código não depende do Supabase além de `js/store-supabase.js`.
 
