@@ -461,14 +461,25 @@ function telaConfig(){
   </div></div>`;
 }
 
+/* ---------- Diagnóstico de conexão ---------- */
+function dicaErro(m){m=String(m||"");
+  if(/does not exist|schema cache|relation|42P01|PGRST205/i.test(m)) return "As tabelas não foram encontradas no banco. No Supabase, abra SQL Editor, cole todo o arquivo supabase/schema.sql e clique em Run.";
+  if(/api ?key|apikey|JWT|Invalid|401|unauthorized/i.test(m)) return "A chave ou a URL do config.js não foram aceitas. Confira a Project URL e a chave publicável (sb_publishable_…) em Settings → API Keys.";
+  if(/permission|policy|row-level|42501/i.test(m)) return "O banco recusou a leitura pelas regras de acesso. Execute novamente o supabase/schema.sql completo.";
+  if(/fetch|network|Failed to/i.test(m)) return "O navegador não alcançou o Supabase. Confira a conexão, a URL do config.js e se o projeto não está pausado no painel do Supabase.";
+  return "Envie esta mensagem ao administrador do sistema.";}
+window.SPAT_ERRO=m=>{if(S.erro===m)return;S.erro=m;console.error("SPAT:",m);if(!S.loaded){S.stale=true;S.loaded=true}render()};
+window.addEventListener("unhandledrejection",e=>window.SPAT_ERRO(e.reason?.message||String(e.reason)));
+window.addEventListener("error",e=>{if(e.message)window.SPAT_ERRO(e.message)});
 /* ---------- Render ---------- */
-async function render(){
+async function render(){try{await render0()}catch(e){console.error(e);const v=$("view");if(v)v.innerHTML=`<div class="banner"><b>Erro ao exibir a tela:</b> ${esc(e.message)}</div>`}}
+async function render0(){
   const r=rota(); const v=$("view");
   if(S.precisaLogin){nav();v.innerHTML=telaLogin();bind();return}
   if(!S.loaded && !S.stale){nav();v.innerHTML=vazio("Carregando o Sistema SPAT…","As informações aparecem assim que a conexão com a base for confirmada.");return}
   if(Store.nomes){const ids=S.demandas.flatMap(d=>[d.solicitante,d.responsavel,...(d.historico||[]).map(h=>h.por)]).concat(Object.keys(S.perfis),[S.me?.id]).filter(i=>i&&!S.prof[i]);if(ids.length)Object.assign(S.prof,await Store.nomes([...new Set(ids)]))}
   nav();
-  const banner = S.stale?`<div class="banner">Não foi possível confirmar a conexão com a base. As informações podem estar desatualizadas.</div>`:"";
+  const banner = S.stale?`<div class="banner"><b>Não foi possível confirmar a conexão com a base.</b>${S.erro?`<br>Erro: <span class="mono">${esc(S.erro)}</span><br>${esc(dicaErro(S.erro))}`:" As informações podem estar desatualizadas. Recarregue a página; se persistir, abra o console do navegador (F12) e envie o erro em vermelho ao administrador."}</div>`:"";
   let html;
   if(!realRole()) html=telaCadastro();
   else if(r.startsWith("d-")) html=telaDetalhe(r.slice(2));

@@ -5,8 +5,8 @@ window.Store = (()=>{
   let sb, me;
   const map = r => ({nome:r.nome,email:r.email,matricula:r.matricula,setor:r.setor,cargo:r.cargo,ramal:r.ramal,papelSolicitado:r.papel_solicitado,justificativa:r.justificativa,criadoEm:r.criado_em,papel:r.papel,status:r.status});
   const err = e => { if(e) throw {code:e.code,message:e.message}; };
-  async function all(table){const {data,error}=await sb.from(table).select("*");err(error);return data||[]}
-  function live(table,load){load();sb.channel("rt-"+table).on("postgres_changes",{event:"*",schema:"public",table},()=>load()).subscribe()}
+  async function all(table){const {data,error}=await sb.from(table).select("*");if(error){window.SPAT_ERRO&&window.SPAT_ERRO(`${table}: ${error.message}${error.code?` (código ${error.code})`:""}`);err(error)}return data||[]}
+  function live(table,load){load();try{sb.channel("rt-"+table).on("postgres_changes",{event:"*",schema:"public",table},()=>load()).subscribe()}catch(e){console.warn("tempo real indisponível",e)}}
   return {
     mode:"supabase",
     logoPadrao: C.logo || null,
