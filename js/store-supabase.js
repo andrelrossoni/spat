@@ -2,7 +2,7 @@
    Requer config.js com window.SPAT_CONFIG = {supabaseUrl, supabaseAnonKey, logo} */
 window.Store = (()=>{
   const C = window.SPAT_CONFIG || {};
-  let sb, me;
+  let sb, me, aguardandoLogin=false;
   const map = r => ({nome:r.nome,email:r.email,matricula:r.matricula,setor:r.setor,cargo:r.cargo,ramal:r.ramal,papelSolicitado:r.papel_solicitado,justificativa:r.justificativa,criadoEm:r.criado_em,papel:r.papel,status:r.status});
   const err = e => { if(e) throw {code:e.code,message:e.message}; };
   async function all(table){const {data,error}=await sb.from(table).select("*");if(error){window.SPAT_ERRO&&window.SPAT_ERRO(`${table}: ${error.message}${error.code?` (código ${error.code})`:""}`);err(error)}return data||[]}
@@ -13,10 +13,13 @@ window.Store = (()=>{
     async init(){
       const KEY=C.supabaseKey||C.supabaseAnonKey;
       if(!C.supabaseUrl||!KEY||/COLE-AQUI|SEU-PROJETO/.test(C.supabaseUrl+KEY)) return {erro:"Instalação incompleta",detalhe:"Preencha supabaseUrl e supabaseKey no arquivo config.js, como descrito no README."};
-      sb = supabase.createClient(C.supabaseUrl, KEY);
-      sb.auth.onAuthStateChange((ev)=>{ if(ev==="SIGNED_IN"&&!me) location.reload(); if(ev==="SIGNED_OUT") location.reload(); });
-      const {data:{session}} = await sb.auth.getSession();
-      if(!session) return {precisaLogin:true};
+      // lock: executa direto, sem a trava navigator.locks, que pode deixar as consultas paradas até a aba receber foco
+      sb = supabase.createClient(C.supabaseUrl, KEY, {auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,lock:async(_n,_t,fn)=>await fn()}});
+      // nunca chamar o Supabase dentro deste callback (outra causa de travamento): só agenda a recarga
+      sb.auth.onAuthStateChange((ev)=>{ if((ev==="SIGNED_IN"&&aguardandoLogin)||(ev==="SIGNED_OUT"&&me)) setTimeout(()=>location.reload(),0); });
+      const limite = new Promise((_,rej)=>setTimeout(()=>rej(new Error("O Supabase não respondeu em 15 segundos (sessão).")),15000));
+      const {data:{session}} = await Promise.race([sb.auth.getSession(), limite]);
+      if(!session){aguardandoLogin=true; return {precisaLogin:true};}
       me = {id:session.user.id, email:session.user.email, nome:"", isOwner:false};
       return {me, podeGravar:true};
     },
