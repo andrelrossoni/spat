@@ -53,6 +53,20 @@ window.Store = (()=>{
       if(error) throw new Error(error.message);
       const el=document.createElement("a");el.href=data.signedUrl;el.rel="noopener";document.body.appendChild(el);el.click();el.remove();
     },
+    async excluirDemanda(id,d){
+      const refs=(d?.anexos||[]).filter(a=>a.tipo==="arquivo"&&a.ref).map(a=>a.ref);
+      if(refs.length){try{await sb.storage.from("anexos").remove(refs)}catch(e){}}
+      const {data,error}=await sb.from("demandas").delete().eq("id",id).select("id");
+      if(error) throw {code:error.code,message:error.message};
+      if(!data||!data.length) throw {code:"42501",message:"permission"};
+    },
+    async reiniciar(demandas,config){
+      const refs=demandas.flatMap(d=>(d.anexos||[]).filter(a=>a.tipo==="arquivo"&&a.ref).map(a=>a.ref));
+      for(let i=0;i<refs.length;i+=100){try{await sb.storage.from("anexos").remove(refs.slice(i,i+100))}catch(e){}}
+      const {data,error}=await sb.rpc("spat_reiniciar",{p_config:!!config});
+      if(error) throw new Error(error.message);
+      return data;
+    },
     async testarEmail(){const {data,error}=await sb.rpc("spat_teste_email");if(error)throw new Error(error.message);return data},
     uploadLogo:null,
     async baixar(nome,blob){const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=nome;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),2000)}

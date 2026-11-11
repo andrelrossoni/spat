@@ -415,10 +415,18 @@ function telaDetalhe(id){
     if(S.form==="pausa"&&d.status==="aberta") acoes.push(formPausa());
   }
   if(isTeam()&&(ativa||planj)) acoes.push(`<div class="row"><input type="date" id="d-prazo" value="${String(d.prazo).slice(0,10)}" aria-label="Nova data prevista"><button class="btn sm" data-act="prazo">${planj?"Ajustar término":"Ajustar prazo"}</button></div>`);
-  if((ativa||planj)&&(isSup()||(d.solicitante===S.me.id&&d.etapa===0))) acoes.push(`<button class="btn sm danger" data-act="cancelar" style="align-self:flex-start">Cancelar demanda</button><div id="confcancel"></div>`);
-  if(!ativa&&isSup()) acoes.push(`<button class="btn sm" data-act="reabrir" style="align-self:flex-start">Reabrir</button>`);
+  const meu=d.solicitante===S.me.id;
+  const podeCancelar=(ativa||planj)&&(isTeam()||meu);
+  const podeExcluir=(isSup()||meu)&&d.etapa===0&&["aberta","planejada","aguardando"].includes(d.status);
+  if(S.form==="cancelar"&&podeCancelar) acoes.push(`<div class="acts"><label class="lbl" for="c-mot">Motivo do cancelamento</label><textarea id="c-mot" class="inp" style="min-height:80px" placeholder="Ex.: o parceiro desistiu da parceria"></textarea>
+    <div class="row"><button class="btn sm" data-act="fechar-form">Voltar</button><button class="btn sm danger" data-act="cancelar2">Confirmar cancelamento</button></div><small class="muted">A demanda fica registrada como cancelada e conta nos indicadores.</small></div>`);
+  else if(S.form==="excluir"&&podeExcluir) acoes.push(`<div class="acts"><div class="note" style="color:var(--bad)"><b>Excluir definitivamente?</b> A demanda, o histórico e os anexos são apagados e ela não aparece nos indicadores.</div>
+    <div class="row"><button class="btn sm" data-act="fechar-form">Voltar</button><button class="btn sm danger" data-act="excluir2">Sim, excluir</button></div></div>`);
+  else if(podeCancelar||podeExcluir) acoes.push(`<div class="row">${podeCancelar?`<button class="btn sm danger" data-act="cancelar">Cancelar demanda</button>`:""}${podeExcluir?`<button class="btn sm danger" data-act="excluir" title="Disponível apenas na etapa de recebimento">Excluir</button>`:""}</div>`);
+  if(!ativa&&!planj&&isSup()) acoes.push(`<button class="btn sm" data-act="reabrir" style="align-self:flex-start">Reabrir</button>`);
   return `<div><a href="#demandas" class="muted" style="font-size:.88rem">← ${seesAll()?"Demandas":"Minhas solicitações"}</a></div>
   <div class="head"><div style="min-width:0"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px"><span class="tag">${esc(d.cod)}</span><span class="dimtag">${esc(dimDe(d.tipo).curto)}</span><span class="pill ${s.k}">${s.t}</span>${d.urgencia==="alta"?'<span class="pill bad">Urgência alta</span>':""}${d.origem==="interna"?'<span class="pill mut">Ação interna</span>':""}${d.exemplo?'<span class="tag">exemplo</span>':""}</div><h1>${esc(d.titulo)}</h1><p>${esc(T.nome)} · etapa ${Math.min(d.etapa+1,et.length)} de ${et.length}: <b style="color:var(--ink)">${esc(etapaAtual(d))}</b></p></div></div>
+  ${d.status==="cancelada"?`<div class="aviso-dem can"><b>Demanda cancelada${d.cancelamento?` em ${fmt(d.cancelamento.em)} por ${esc(nome(d.cancelamento.por))}`:""}</b>${d.cancelamento?.motivo?`<div class="x">${esc(d.cancelamento.motivo)}</div>`:""}</div>`:""}
   ${d.status==="aguardando"?`<div class="aviso-dem ${d.respondido?"ok":"warn"}"><b>${d.respondido?"O solicitante respondeu à pendência":d.solicitante===S.me.id?"O SPAT aguarda sua manifestação":"Aguardando o solicitante"}</b>${d.pendencia?`<div class="x">${esc(d.pendencia)}</div>`:""}<small>${d.respondido?(isTeam()?"Confira a resposta no histórico e retome o atendimento.":"A equipe foi avisada e vai retomar o atendimento."):d.solicitante===S.me.id?"Responda pela caixa de mensagem ou anexe o documento pedido. O prazo está suspenso e a equipe é avisada quando você responder.":`Prazo suspenso desde ${fmt(d.pausadoEm)}.`}</small></div>`:""}
   ${S.form==="entrega"&&podeConcluir?formEntrega(d,T):""}
   ${painelEntrega(d)}
@@ -454,28 +462,31 @@ function telaDetalhe(id){
 /* ---------- Indicadores por dimensão ---------- */
 function baseRel(){return S.demandas.filter(d=>!d.exemplo||S.incluiEx)}
 function calcDim(dimId,P,base){
-  const l=base.filter(d=>TIPOS[d.tipo].dim===dimId&&d.status!=="cancelada");
-  const rec=l.filter(d=>d.status!=="planejada"&&dentro(inicioD(d),P));
+  const todas=base.filter(d=>TIPOS[d.tipo].dim===dimId);
+  const l=todas.filter(d=>d.status!=="cancelada");
+  const recebida=d=>d.status!=="planejada"&&!(d.status==="cancelada"&&d.cancelamento?.estava==="planejada");
+  const rec=todas.filter(d=>recebida(d)&&dentro(inicioD(d),P));
+  const can=todas.filter(d=>d.status==="cancelada"&&dentro(d.cancelamento?.em||d.atualizadoEm,P));
   const con=l.filter(d=>d.status==="concluida"&&dentro(d.concluidaEm,P));
   const conAno=l.filter(d=>d.status==="concluida"&&d.concluidaEm&&new Date(d.concluidaEm).getFullYear()===P.ano).length;
   const and=l.filter(ativaD);
   const prazo=con.length?Math.round(con.filter(d=>dia(d.concluidaEm)<=dia(d.prazo)).length/con.length*100):null;
   const tempo=con.length?Math.round(con.reduce((a,d)=>a+du(inicioD(d),d.concluidaEm),0)/con.length):null;
-  const tipos=Object.entries(TIPOS).filter(([,t])=>t.dim===dimId).map(([k,t])=>({k,t,rec:rec.filter(d=>d.tipo===k).length,con:con.filter(d=>d.tipo===k).length,and:and.filter(d=>d.tipo===k).length}));
+  const tipos=Object.entries(TIPOS).filter(([,t])=>t.dim===dimId).map(([k,t])=>({k,t,rec:rec.filter(d=>d.tipo===k).length,con:con.filter(d=>d.tipo===k).length,can:can.filter(d=>d.tipo===k).length,and:and.filter(d=>d.tipo===k).length}));
   const meta=+(((S.cfg.metas?.map||{})[P.ano]||{})[dimId])||0;
-  return {rec,con,and,prazo,tempo,tipos,atr:and.filter(atrasadaD).length,conAno,meta};
+  return {rec,con,can,and,prazo,tempo,tipos,atr:and.filter(atrasadaD).length,conAno,meta};
 }
 function dadosRelatorio(){
   const P=periodo(), base=baseRel();
   const dims=DIMS.map(d=>({d,...calcDim(d.id,P,base)}));
   const conAll=dims.flatMap(x=>x.con);
-  const tot={rec:dims.reduce((a,x)=>a+x.rec.length,0),con:conAll.length,and:dims.reduce((a,x)=>a+x.and.length,0),atr:dims.reduce((a,x)=>a+x.atr,0),
+  const tot={rec:dims.reduce((a,x)=>a+x.rec.length,0),con:conAll.length,can:dims.reduce((a,x)=>a+x.can.length,0),and:dims.reduce((a,x)=>a+x.and.length,0),atr:dims.reduce((a,x)=>a+x.atr,0),
     prazo:conAll.length?Math.round(conAll.filter(d=>dia(d.concluidaEm)<=dia(d.prazo)).length/conAll.length*100):null,
     tempo:conAll.length?Math.round(conAll.reduce((a,d)=>a+du(inicioD(d),d.concluidaEm),0)/conAll.length):null};
-  const servicos=dims.flatMap(x=>x.tipos.map(t=>({dim:x.d.curto,nome:t.t.nome,ind:t.t.ind,rec:t.rec,con:t.con,and:t.and,sla:slaDe(t.k)})));
-  const mensal=[];for(let m=P.i;m<=P.f;m++){const Q={ini:new Date(P.ano,m,1),fim:new Date(P.ano,m+1,1)};mensal.push({rotulo:`${MESES[m]}/${String(P.ano).slice(2)}`,rec:base.filter(d=>d.status!=="cancelada"&&d.status!=="planejada"&&dentro(inicioD(d),Q)).length,con:base.filter(d=>d.status==="concluida"&&dentro(d.concluidaEm,Q)).length})}
-  const lin=d=>{const s=situacao(d);return {cod:d.cod,dim:dimDe(d.tipo).curto,servico:TIPOS[d.tipo].nome,titulo:d.titulo,origem:d.origem==="interna"?"Ação interna":"Solicitação",solicitante:nome(d.solicitante),unidade:d.unidade||"",parceiro:d.parceiro||"",responsavel:nome(d.responsavel),situacao:s.t,sitK:s.k,etapa:etapaAtual(d),criadoEm:inicioD(d),prazo:d.prazo,concluidaEm:d.concluidaEm||null,du:du(inicioD(d),d.concluidaEm||hoje())}};
-  const lista=base.filter(d=>d.status!=="cancelada"&&(dentro(inicioD(d),P)||dentro(d.concluidaEm,P)||ativaD(d)||d.status==="planejada")).sort((a,b)=>inicioD(a)<inicioD(b)?-1:1).map(lin);
+  const servicos=dims.flatMap(x=>x.tipos.map(t=>({dim:x.d.curto,nome:t.t.nome,ind:t.t.ind,rec:t.rec,con:t.con,can:t.can,and:t.and,sla:slaDe(t.k)})));
+  const mensal=[];for(let m=P.i;m<=P.f;m++){const Q={ini:new Date(P.ano,m,1),fim:new Date(P.ano,m+1,1)};mensal.push({rotulo:`${MESES[m]}/${String(P.ano).slice(2)}`,rec:base.filter(d=>d.status!=="planejada"&&!(d.status==="cancelada"&&d.cancelamento?.estava==="planejada")&&dentro(inicioD(d),Q)).length,con:base.filter(d=>d.status==="concluida"&&dentro(d.concluidaEm,Q)).length,can:base.filter(d=>d.status==="cancelada"&&dentro(d.cancelamento?.em||d.atualizadoEm,Q)).length})}
+  const lin=d=>{const s=situacao(d);return {cod:d.cod,dim:dimDe(d.tipo).curto,servico:TIPOS[d.tipo].nome,titulo:d.titulo,origem:d.origem==="interna"?"Ação interna":"Solicitação",solicitante:nome(d.solicitante),unidade:d.unidade||"",parceiro:d.parceiro||"",responsavel:nome(d.responsavel),situacao:s.t,sitK:s.k,motivo:d.status==="cancelada"?(d.cancelamento?.motivo||""):"",etapa:etapaAtual(d),criadoEm:inicioD(d),prazo:d.prazo,concluidaEm:d.concluidaEm||null,du:du(inicioD(d),d.concluidaEm||hoje())}};
+  const lista=base.filter(d=>d.status==="cancelada"?(dentro(inicioD(d),P)||dentro(d.cancelamento?.em||d.atualizadoEm,P)):(dentro(inicioD(d),P)||dentro(d.concluidaEm,P)||ativaD(d)||d.status==="planejada")).sort((a,b)=>inicioD(a)<inicioD(b)?-1:1).map(lin);
   const ativos=base.filter(z=>TIPOS[z.tipo].dim==="imp"&&z.status!=="cancelada"&&(ativaD(z)||z.status==="planejada"||dentro(z.concluidaEm,P))).flatMap(z=>(z.ativos||[]).map(a=>({nome:a.nome,modo:a.modo==="monitoramento"?"Monitoramento":"Avaliação",ciclo:z.titulo,cod:z.cod,etapa:etapaAtual(z),situacao:situacao(z).t,prazo:z.prazo,prazoTxt:fmt(z.prazo)})));
   const atrasadas=base.filter(atrasadaD).sort((a,b)=>a.prazo<b.prazo?-1:1).map(lin);
   const chefia=base.filter(d=>d.status==="aberta"&&etAprov(TIPOS[d.tipo].etapas[d.etapa])).map(lin);
@@ -497,16 +508,16 @@ function telaIndicadores(){
   const blocos=Rr.dims.map(x=>{const d=x.d;let extra="";
     if(d.id==="imp"){const av=Rr.ativos.filter(a=>a.modo==="Avaliação").length;extra=`<div class="met azul"><b>${av}</b><span>Ativos em avaliação</span></div><div class="met azul"><b>${Rr.ativos.length-av}</b><span>Ativos em monitoramento</span></div>`}
     return `<section class="panel ind"><div class="dimhd"><span class="num">${d.n}</span><h2>${esc(d.nome)}</h2></div>
-     <div class="mets"><div class="met"><b>${x.rec.length}</b><span>Recebidas no período</span></div><div class="met"><b>${x.con.length}</b><span>Entregas concluídas</span></div><div class="met"><b>${x.and.length}</b><span>Em andamento hoje${x.atr?` · ${x.atr} atrasada(s)`:""}</span></div><div class="met"><b>${x.prazo==null?"—":x.prazo+"%"}</b><span>Concluídas no prazo</span></div><div class="met"><b>${x.tempo==null?"—":x.tempo}</b><span>Tempo médio (d.u.)</span></div>${extra}</div>
+     <div class="mets"><div class="met"><b>${x.rec.length}</b><span>Recebidas no período</span></div><div class="met"><b>${x.con.length}</b><span>Entregas concluídas</span></div><div class="met cinza"><b>${x.can.length}</b><span>Canceladas no período</span></div><div class="met"><b>${x.and.length}</b><span>Em andamento hoje${x.atr?` · ${x.atr} atrasada(s)`:""}</span></div><div class="met"><b>${x.prazo==null?"—":x.prazo+"%"}</b><span>Concluídas no prazo</span></div><div class="met"><b>${x.tempo==null?"—":x.tempo}</b><span>Tempo médio (d.u.)</span></div>${extra}</div>
      ${x.meta?`<div class="meta"><span>Meta ${P.ano}: <b>${x.conAno} de ${x.meta}</b> entregas no ano</span><div class="bar"><i style="width:${Math.min(100,x.conAno/x.meta*100)}%"></i></div><span class="mono">${Math.round(x.conAno/x.meta*100)}%</span></div>`:""}
-     <div class="scroll"><table class="mini"><thead><tr><th>Indicador de entrega</th><th style="text-align:right">Recebidas</th><th style="text-align:right">Concluídas</th><th style="text-align:right">Em andamento</th></tr></thead><tbody>${x.tipos.map(y=>`<tr><td>${esc(y.t.ind)}</td><td class="n">${y.rec}</td><td class="n">${y.con}</td><td class="n">${y.and}</td></tr>`).join("")}</tbody></table></div></section>`}).join("");
+     <div class="scroll"><table class="mini"><thead><tr><th>Indicador de entrega</th><th style="text-align:right">Recebidas</th><th style="text-align:right">Concluídas</th><th style="text-align:right">Canceladas</th><th style="text-align:right">Em andamento</th></tr></thead><tbody>${x.tipos.map(y=>`<tr><td>${esc(y.t.ind)}</td><td class="n">${y.rec}</td><td class="n">${y.con}</td><td class="n">${y.can}</td><td class="n">${y.and}</td></tr>`).join("")}</tbody></table></div></section>`}).join("");
   return `<div class="head"><div><h1>Indicadores do SPAT</h1><p>${esc(P.rotulo)} · entregas e desempenho por dimensão de atuação</p></div></div>
    <div class="panel" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between">
     <div class="filters"><select id="iano" class="inp" aria-label="Ano">${anos.map(a=>`<option ${a===S.ano?"selected":""}>${a}</option>`).join("")}</select><select id="iper" class="inp" aria-label="Período">${PERIODOS.map(([k,t])=>`<option value="${k}" ${S.per===k?"selected":""}>${t}</option>`).join("")}</select>${S.demandas.some(d=>d.exemplo)?`<label style="font-size:.85rem"><input type="checkbox" id="iex" ${S.incluiEx?"checked":""}> Incluir exemplos</label>`:""}</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn pri" id="xlsx">Exportar Excel</button><button class="btn pri" id="pptx">Gerar apresentação</button><button class="btn" id="csv">CSV</button></div></div>
-   <div class="kpis"><div class="kpi"><b>${T.rec}</b><span>Recebidas no período</span></div><div class="kpi"><b>${T.con}</b><span>Concluídas no período${T.prazo!=null?` · ${T.prazo}% no prazo`:""}</span></div><div class="kpi"><b>${T.and}</b><span>Em andamento hoje</span></div><div class="kpi ${T.atr?"bad":""}"><b>${T.atr}</b><span>Atrasadas hoje</span></div></div>
+   <div class="kpis k5"><div class="kpi"><b>${T.rec}</b><span>Recebidas no período</span></div><div class="kpi"><b>${T.con}</b><span>Concluídas no período${T.prazo!=null?` · ${T.prazo}% no prazo`:""}</span></div><div class="kpi"><b>${T.can}</b><span>Canceladas no período</span></div><div class="kpi"><b>${T.and}</b><span>Em andamento hoje</span></div><div class="kpi ${T.atr?"bad":""}"><b>${T.atr}</b><span>Atrasadas hoje</span></div></div>
    ${blocos}
-   <p class="note">Recebidas pela data de início e concluídas pela data de conclusão dentro do período; em andamento e atrasadas na posição de hoje; canceladas e ações apenas planejadas não entram. O Excel traz resumo, entregas por serviço, evolução mensal, cronograma, lista de demandas e carteira de impactos, com gráficos. A apresentação traz capa, visão geral, evolução, um slide por dimensão, cronograma, impactos e pontos de atenção.${isSup()?' Metas anuais por dimensão: <a href="#config">Configurações</a>.':""}</p>`;
+   <p class="note">Recebidas pela data de início e concluídas pela data de conclusão dentro do período; em andamento e atrasadas na posição de hoje; canceladas contam pela data do cancelamento, com o motivo registrado; ações apenas planejadas e demandas excluídas não entram. O Excel traz resumo, entregas por serviço, evolução mensal, cronograma, lista de demandas e carteira de impactos, com gráficos. A apresentação traz capa, visão geral, evolução, um slide por dimensão, cronograma, impactos e pontos de atenção.${isSup()?' Metas anuais por dimensão: <a href="#config">Configurações</a>.':""}</p>`;
 }
 
 /* ---------- Cronograma (Gantt) ---------- */
@@ -594,6 +605,10 @@ function telaConfig(){
    <div class="panel"><div class="sec-t"><h2>Dados de exemplo</h2></div>
     <p class="muted" style="margin:0 0 12px;font-size:.88rem">Insere cinco demandas marcadas como exemplo, uma por dimensão, para treinar a equipe. Os indicadores ignoram exemplos por padrão.</p>
     <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="seed">Inserir exemplos</button><button class="btn danger" id="unseed" ${ex?"":"disabled"}>Remover ${ex} exemplo(s)</button></div></div>
+   <div class="panel perigo"><div class="sec-t"><h2>Reiniciar o sistema</h2></div>
+    <p style="margin:0 0 10px;font-size:.9rem">Apaga <b>todas as demandas</b> (${S.demandas.length}), com histórico, anexos e avisos, e devolve o sistema ao estado inicial. <b>As pessoas cadastradas e seus perfis são mantidos.</b> Não há como desfazer.</p>
+    <label style="font-size:.88rem;display:flex;gap:8px;align-items:center"><input type="checkbox" id="rs-cfg"> Também restaurar prazos, serviços oferecidos e metas para o padrão</label>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center"><input id="rs-conf" class="inp" placeholder="Digite REINICIAR" style="flex:1 1 180px" autocomplete="off"><button class="btn danger" id="rs-ok">Reiniciar o sistema</button></div></div>
   </div></div>`;
 }
 
@@ -752,6 +767,13 @@ function bind(){
   if($("logofile")) $("logofile").onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const url=await Store.uploadLogo(f);await Store.setConfig("marca",{...(S.cfg.marca||{}),logo:url});toast("Marca atualizada")}catch(err){toast("Não foi possível enviar o arquivo.")}};
   if($("logodel")) $("logodel").onclick=async()=>{try{await Store.setConfig("marca",{logo:null})}catch(e){}};
   if($("seed")) $("seed").onclick=seed;
+  if($("rs-ok")) $("rs-ok").onclick=async e=>{
+    if($("rs-conf").value.trim().toUpperCase()!=="REINICIAR"){toast("Digite REINICIAR para confirmar.");return}
+    const b=e.currentTarget;b.disabled=true;b.textContent="Reiniciando…";
+    try{const msg=await Store.reiniciar(S.demandas.slice(),$("rs-cfg").checked);S.demandas=[];
+      try{localStorage.removeItem("spat-seen");localStorage.removeItem(vistasKey())}catch(err){}
+      toast(msg||"Sistema reiniciado");location.hash="inicio"}
+    catch(err){toast(err.message||"Não foi possível reiniciar.");b.disabled=false;b.textContent="Reiniciar o sistema"}};
   if($("unseed")) $("unseed").onclick=async()=>{for(const d of S.demandas.filter(x=>x.exemplo)){try{await Store.delDemanda(d.id)}catch(e){}}toast("Exemplos removidos")};
 }
 
@@ -802,9 +824,17 @@ async function acao(id,act,btn){
     return mutate(id,x=>{x.status="aguardando";x.pausadoEm=agora;x.pendencia=t;x.respondido=false;delete x.respondidoEm;x.historico.push(evento("Aguardando manifestação do solicitante. Contagem do prazo suspensa."));x.historico.push({em:agora,por:S.me.id,t:"Pendência: "+t,tipo:"comentario",auto:true})}).then(v=>{if(v){S.form=null;toast("Prazo suspenso e solicitante avisado");render()}})}
   if(act==="retomar") return mutate(id,x=>{const n=Math.max(0,du(x.pausadoEm||agora,agora));x.status="aberta";x.prazo=addDU(x.prazo,n).toISOString();delete x.pausadoEm;delete x.respondido;delete x.respondidoEm;x.historico.push(evento(n>0?`Atendimento retomado. Previsão estendida em ${n} d.u., para ${fmt(x.prazo)}.`:`Atendimento retomado. Previsão mantida em ${fmt(x.prazo)}.`))}).then(ok("Atendimento retomado"));
   if(act==="prazo"){const v=$("d-prazo").value;if(!v)return;const nd=new Date(v+"T12:00:00");return mutate(id,x=>{x.prazo=nd.toISOString();x.historico.push(evento(`Previsão de entrega ajustada para ${fmt(x.prazo)}`))}).then(ok("Prazo ajustado"))}
-  if(act==="cancelar"){$("confcancel").innerHTML=`<div class="note" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">Cancelar esta demanda? <button class="btn sm danger" type="button">Sim, cancelar</button></div>`;$("confcancel").querySelector("button").onclick=()=>acao(id,"cancelar2");return}
-  if(act==="cancelar2") return mutate(id,x=>{x.status="cancelada";x.historico.push(evento("Demanda cancelada"))}).then(ok("Demanda cancelada"));
-  if(act==="reabrir") return mutate(id,x=>{x.status="aberta";delete x.concluidaEm;x.historico.push(evento("Demanda reaberta"))}).then(ok("Demanda reaberta"));
+  if(act==="cancelar"){S.form="cancelar";S.noKeep=true;render();setTimeout(()=>$("c-mot")?.focus(),30);return}
+  if(act==="cancelar2"){const m=$("c-mot").value.trim();if(m.length<5){toast("Informe o motivo do cancelamento.");return}
+    return mutate(id,x=>{x.cancelamento={motivo:m,por:S.me.id,em:agora,estava:x.status,etapa:x.etapa};x.status="cancelada";delete x.pausadoEm;delete x.respondido;
+      x.historico.push(evento(`Demanda cancelada na etapa "${etN(T.etapas[x.etapa])}"`));x.historico.push({em:agora,por:S.me.id,t:"Motivo do cancelamento: "+m,tipo:"comentario",auto:true})})
+      .then(v=>{if(v){S.form=null;toast("Demanda cancelada");render()}})}
+  if(act==="excluir"){S.form="excluir";S.noKeep=true;render();return}
+  if(act==="excluir2"){btn.disabled=true;
+    try{await Store.excluirDemanda(id,d);S.form=null;toast("Demanda excluída");location.hash=seesAll()?"demandas":"inicio"}
+    catch(e){btn.disabled=false;toast(e?.code==="42501"||/permission|policy/i.test(e?.message||"")?"Sem permissão para excluir. A exclusão só vale na etapa de recebimento.":"Não foi possível excluir agora.")}
+    return}
+  if(act==="reabrir") return mutate(id,x=>{const antes=x.cancelamento?.estava;x.status=x.status==="cancelada"&&antes&&antes!=="aguardando"?antes:"aberta";delete x.concluidaEm;if(x.cancelamento){x.cancelamentoAnterior=x.cancelamento;delete x.cancelamento}x.historico.push(evento("Demanda reaberta"))}).then(ok("Demanda reaberta"));
 }
 
 async function seed(){

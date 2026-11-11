@@ -292,3 +292,10 @@ a.g-row:hover{background:var(--sunk)}
 .ok-panel h2{color:var(--ok)}
 .form-entrega{border:2px solid var(--verde)}
 @media (max-width:760px){.topo-dir .sist{display:none}.notif{top:calc(60px + env(safe-area-inset-top,0px))}}
+/* cancelamento, exclusão, reinício */
+.aviso-dem.can{background:var(--sunk);color:var(--muted)}
+.met.cinza{border-left-color:#a7b4b2}
+.kpis.k5{grid-template-columns:repeat(5,minmax(0,1fr))}
+@media (max-width:980px){.kpis.k5{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.panel.perigo{border-color:var(--bad)}
+.panel.perigo h2{color:var(--bad)}

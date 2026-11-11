@@ -140,38 +140,38 @@ const Export = (()=>{
     const sheets=[]; // {nome, rows, cols, merges, filtro, congelar, itens:[{img}|{chart}]}
     const logo={img:true,pos:[0,0],cx:1450000,cy:Math.round(1450000/MARCA.proporcao)};
     /* 1. Resumo */
-    {const h=cabecalhoPlanilha(R,"Indicadores do SPAT",9); const rows=h.rows; const nome="Resumo";
+    {const h=cabecalhoPlanilha(R,"Indicadores do SPAT",10); const rows=h.rows; const nome="Resumo";
      rows[4]=[{v:"Visão geral do período",s:ST.secao}];
-     const k=[["Demandas recebidas",R.tot.rec],["Entregas concluídas",R.tot.con],["Concluídas no prazo",R.tot.prazo==null?null:R.tot.prazo/100],["Em andamento hoje",R.tot.and],["Atrasadas hoje",R.tot.atr]];
+     const k=[["Demandas recebidas",R.tot.rec],["Entregas concluídas",R.tot.con],["Concluídas no prazo",R.tot.prazo==null?null:R.tot.prazo/100],["Em andamento hoje",R.tot.and],["Atrasadas hoje",R.tot.atr],["Canceladas no período",R.tot.can]];
      rows[5]=[];rows[6]=[];const merges=[...h.merges];
-     k.forEach(([l,v],i)=>{const c=i===0?0:i*2-1;rows[5][c]={v,s:i===2?ST.kpiPct:ST.kpiV};rows[6][c]={v:l,s:ST.kpiL};if(i>0){rows[5][c+1]={s:ST.kpiV};rows[6][c+1]={s:ST.kpiL};merges.push(`${ref(c,5)}:${ref(c+1,5)}`,`${ref(c,6)}:${ref(c+1,6)}`)}});
+     k.forEach(([l,v],i)=>{const c=i===0?0:i*2-1;rows[5][c]={v,s:i===2?ST.kpiPct:ST.kpiV};rows[6][c]={v:l,s:ST.kpiL};if(i>0&&i<5){rows[5][c+1]={s:ST.kpiV};rows[6][c+1]={s:ST.kpiL};merges.push(`${ref(c,5)}:${ref(c+1,5)}`,`${ref(c,6)}:${ref(c+1,6)}`)}});
      rows[8]=[{v:"Indicadores por dimensão de atuação",s:ST.secao}];
-     rows[9]=["Dimensão","Recebidas","Concluídas","Em andamento","Atrasadas","% no prazo","Tempo médio (d.u.)","Meta anual","% da meta"].map(v=>({v,s:ST.cab}));
-     R.dims.forEach((x,i)=>{rows[10+i]=[{v:`${x.d.n==="·"?"":x.d.n+". "}${x.d.curto}`,s:ST.txt},{v:x.rec.length,s:ST.int},{v:x.con.length,s:ST.int},{v:x.and.length,s:ST.int},{v:x.atr,s:ST.int},{v:x.prazo==null?null:x.prazo/100,s:ST.pct},{v:x.tempo,s:ST.int},{v:x.meta||null,s:ST.int},{v:x.meta?x.conAno/x.meta:null,s:ST.pct}]});
+     rows[9]=["Dimensão","Recebidas","Concluídas","Canceladas","Em andamento","Atrasadas","% no prazo","Tempo médio (d.u.)","Meta anual","% da meta"].map(v=>({v,s:ST.cab}));
+     R.dims.forEach((x,i)=>{rows[10+i]=[{v:`${x.d.n==="·"?"":x.d.n+". "}${x.d.curto}`,s:ST.txt},{v:x.rec.length,s:ST.int},{v:x.con.length,s:ST.int},{v:x.can.length,s:ST.int},{v:x.and.length,s:ST.int},{v:x.atr,s:ST.int},{v:x.prazo==null?null:x.prazo/100,s:ST.pct},{v:x.tempo,s:ST.int},{v:x.meta||null,s:ST.int},{v:x.meta?x.conAno/x.meta:null,s:ST.pct}]});
      const tr=10+R.dims.length; const n=R.dims.length;
-     rows[tr]=[{v:"Total",s:ST.totTxt},{v:R.tot.rec,s:ST.totInt},{v:R.tot.con,s:ST.totInt},{v:R.tot.and,s:ST.totInt},{v:R.tot.atr,s:ST.totInt},{v:R.tot.prazo==null?null:R.tot.prazo/100,s:ST.pct},{v:R.tot.tempo,s:ST.totInt},{v:null,s:ST.totInt},{v:null,s:ST.totInt}];
-     rows[tr+1]=[{v:"Recebidas e concluídas pela data de abertura e de conclusão no período; em andamento e atrasadas na posição de hoje. Canceladas não entram.",s:ST.sub}];
+     rows[tr]=[{v:"Total",s:ST.totTxt},{v:R.tot.rec,s:ST.totInt},{v:R.tot.con,s:ST.totInt},{v:R.tot.can,s:ST.totInt},{v:R.tot.and,s:ST.totInt},{v:R.tot.atr,s:ST.totInt},{v:R.tot.prazo==null?null:R.tot.prazo/100,s:ST.pct},{v:R.tot.tempo,s:ST.totInt},{v:null,s:ST.totInt},{v:null,s:ST.totInt}];
+     rows[tr+1]=[{v:"Recebidas e concluídas pela data de abertura e de conclusão no período; em andamento e atrasadas na posição de hoje. Canceladas pela data do cancelamento. Demandas excluídas não entram.",s:ST.sub}];
      const cats=R.dims.map(x=>x.d.curto), catRef=`${qs(nome)}!$A$11:$A$${10+n}`;
-     sheets.push({nome,rows,merges,alturas:{...h.alturas,5:34,6:30,9:30},cols:[30,13,13,13,13,13,13,13,13],primeira:true,itens:[logo,
-       {chart:chartXml({tipo:"col",titulo:"Demandas recebidas e concluídas por dimensão",cats,catRef,series:[{nome:"Recebidas",nomeRef:`${qs(nome)}!$B$10`,ref:`${qs(nome)}!$B$11:$B$${10+n}`,vals:R.dims.map(x=>x.rec.length),cor:COR.azul},{nome:"Concluídas",nomeRef:`${qs(nome)}!$C$10`,ref:`${qs(nome)}!$C$11:$C$${10+n}`,vals:R.dims.map(x=>x.con.length),cor:COR.verde}]}),pos:[0,tr+3,5,tr+23]},
-       {chart:chartXml({tipo:"bar",titulo:"Concluídas no prazo por dimensão",pct:true,cats,catRef,series:[{nome:"% no prazo",nomeRef:`${qs(nome)}!$F$10`,ref:`${qs(nome)}!$F$11:$F$${10+n}`,vals:R.dims.map(x=>x.prazo==null?null:x.prazo/100),cor:COR.verde}]}),pos:[5,tr+3,9,tr+23]}]});
+     sheets.push({nome,rows,merges,alturas:{...h.alturas,5:34,6:30,9:30},cols:[30,13,13,13,13,13,13,13,13,13],primeira:true,itens:[logo,
+       {chart:chartXml({tipo:"col",titulo:"Demandas recebidas, concluídas e canceladas por dimensão",cats,catRef,series:[{nome:"Recebidas",nomeRef:`${qs(nome)}!$B$10`,ref:`${qs(nome)}!$B$11:$B$${10+n}`,vals:R.dims.map(x=>x.rec.length),cor:COR.azul},{nome:"Concluídas",nomeRef:`${qs(nome)}!$C$10`,ref:`${qs(nome)}!$C$11:$C$${10+n}`,vals:R.dims.map(x=>x.con.length),cor:COR.verde},{nome:"Canceladas",nomeRef:`${qs(nome)}!$D$10`,ref:`${qs(nome)}!$D$11:$D$${10+n}`,vals:R.dims.map(x=>x.can.length),cor:COR.cinza}]}),pos:[0,tr+3,5,tr+23]},
+       {chart:chartXml({tipo:"bar",titulo:"Concluídas no prazo por dimensão",pct:true,cats,catRef,series:[{nome:"% no prazo",nomeRef:`${qs(nome)}!$G$10`,ref:`${qs(nome)}!$G$11:$G$${10+n}`,vals:R.dims.map(x=>x.prazo==null?null:x.prazo/100),cor:COR.verde}]}),pos:[5,tr+3,10,tr+23]}]});
     }
     /* 2. Por serviço */
     {const h=cabecalhoPlanilha(R,"Entregas por serviço",8);const rows=h.rows;const nome="Por serviço";
-     rows[4]=["Dimensão","Serviço","Indicador de entrega","Recebidas","Concluídas","Em andamento","Prazo de ref. (d.u.)"].map(v=>({v,s:ST.cab}));
-     R.servicos.forEach((s,i)=>{rows[5+i]=[{v:s.dim,s:ST.txt},{v:s.nome,s:ST.txt},{v:s.ind,s:ST.txt},{v:s.rec,s:ST.int},{v:s.con,s:ST.int},{v:s.and,s:ST.int},{v:s.sla,s:ST.int}]});
+     rows[4]=["Dimensão","Serviço","Indicador de entrega","Recebidas","Concluídas","Canceladas","Em andamento","Prazo de ref. (d.u.)"].map(v=>({v,s:ST.cab}));
+     R.servicos.forEach((s,i)=>{rows[5+i]=[{v:s.dim,s:ST.txt},{v:s.nome,s:ST.txt},{v:s.ind,s:ST.txt},{v:s.rec,s:ST.int},{v:s.con,s:ST.int},{v:s.can,s:ST.int},{v:s.and,s:ST.int},{v:s.sla,s:ST.int}]});
      const n=R.servicos.length;
-     sheets.push({nome,rows,merges:h.merges,alturas:{...h.alturas,4:30},cols:[24,40,36,12,12,13,14],filtro:`A5:G${5+n}`,congelar:{r:5},itens:[logo,
-       {chart:chartXml({tipo:"bar",titulo:"Entregas concluídas por serviço no período",gap:40,cats:R.servicos.map(s=>s.ind),catRef:`${qs(nome)}!$C$6:$C$${5+n}`,series:[{nome:"Concluídas",nomeRef:`${qs(nome)}!$E$5`,ref:`${qs(nome)}!$E$6:$E$${5+n}`,vals:R.servicos.map(s=>s.con),cor:COR.verde}]}),pos:[8,4,17,5+n+2]}]});
+     sheets.push({nome,rows,merges:h.merges,alturas:{...h.alturas,4:30},cols:[24,40,36,12,12,12,13,14],filtro:`A5:H${5+n}`,congelar:{r:5},itens:[logo,
+       {chart:chartXml({tipo:"bar",titulo:"Entregas concluídas por serviço no período",gap:40,cats:R.servicos.map(s=>s.ind),catRef:`${qs(nome)}!$C$6:$C$${5+n}`,series:[{nome:"Concluídas",nomeRef:`${qs(nome)}!$E$5`,ref:`${qs(nome)}!$E$6:$E$${5+n}`,vals:R.servicos.map(s=>s.con),cor:COR.verde}]}),pos:[9,4,18,5+n+2]}]});
     }
     /* 3. Evolução mensal */
     {const h=cabecalhoPlanilha(R,"Evolução mensal",6);const rows=h.rows;const nome="Evolução mensal";
-     rows[4]=["Mês","Recebidas","Concluídas","Concluídas acumuladas"].map(v=>({v,s:ST.cab}));
-     let ac=0;R.mensal.forEach((m,i)=>{ac+=m.con;rows[5+i]=[{v:m.rotulo,s:ST.txt},{v:m.rec,s:ST.int},{v:m.con,s:ST.int},{v:ac,s:ST.int}]});
+     rows[4]=["Mês","Recebidas","Concluídas","Canceladas","Concluídas acumuladas"].map(v=>({v,s:ST.cab}));
+     let ac=0;R.mensal.forEach((m,i)=>{ac+=m.con;rows[5+i]=[{v:m.rotulo,s:ST.txt},{v:m.rec,s:ST.int},{v:m.con,s:ST.int},{v:m.can,s:ST.int},{v:ac,s:ST.int}]});
      const n=R.mensal.length,cats=R.mensal.map(m=>m.rotulo),catRef=`${qs(nome)}!$A$6:$A$${5+n}`;
-     sheets.push({nome,rows,merges:h.merges,alturas:{...h.alturas,4:30},cols:[16,13,13,16],itens:[logo,
-       {chart:chartXml({tipo:"col",titulo:"Recebidas e concluídas por mês",cats,catRef,series:[{nome:"Recebidas",nomeRef:`${qs(nome)}!$B$5`,ref:`${qs(nome)}!$B$6:$B$${5+n}`,vals:R.mensal.map(m=>m.rec),cor:COR.azul},{nome:"Concluídas",nomeRef:`${qs(nome)}!$C$5`,ref:`${qs(nome)}!$C$6:$C$${5+n}`,vals:R.mensal.map(m=>m.con),cor:COR.verde}]}),pos:[5,4,14,22]},
-       {chart:chartXml({tipo:"line",titulo:"Entregas concluídas acumuladas",cats,catRef,series:[{nome:"Acumulado",nomeRef:`${qs(nome)}!$D$5`,ref:`${qs(nome)}!$D$6:$D$${5+n}`,vals:R.mensal.reduce((a,m)=>{a.push((a.at(-1)||0)+m.con);return a},[]),cor:COR.verde}]}),pos:[5,23,14,41]}]});
+     sheets.push({nome,rows,merges:h.merges,alturas:{...h.alturas,4:30},cols:[16,13,13,13,16],itens:[logo,
+       {chart:chartXml({tipo:"col",titulo:"Recebidas, concluídas e canceladas por mês",cats,catRef,series:[{nome:"Recebidas",nomeRef:`${qs(nome)}!$B$5`,ref:`${qs(nome)}!$B$6:$B$${5+n}`,vals:R.mensal.map(m=>m.rec),cor:COR.azul},{nome:"Concluídas",nomeRef:`${qs(nome)}!$C$5`,ref:`${qs(nome)}!$C$6:$C$${5+n}`,vals:R.mensal.map(m=>m.con),cor:COR.verde},{nome:"Canceladas",nomeRef:`${qs(nome)}!$D$5`,ref:`${qs(nome)}!$D$6:$D$${5+n}`,vals:R.mensal.map(m=>m.can),cor:COR.cinza}]}),pos:[6,4,15,22]},
+       {chart:chartXml({tipo:"line",titulo:"Entregas concluídas acumuladas",cats,catRef,series:[{nome:"Acumulado",nomeRef:`${qs(nome)}!$E$5`,ref:`${qs(nome)}!$E$6:$E$${5+n}`,vals:R.mensal.reduce((a,m)=>{a.push((a.at(-1)||0)+m.con);return a},[]),cor:COR.verde}]}),pos:[6,23,15,41]}]});
     }
     /* 4. Cronograma (Gantt semanal) */
     {const nome="Cronograma";const G=R.gantt;const sem=G.semanas;const c0=6;
@@ -185,12 +185,12 @@ const Export = (()=>{
      sheets.push({nome,rows,merges:[`C1:N1`],alturas:{0:30,4:52},cols:[16,46,22,20,11,11].concat(sem.map(()=>3.2)),congelar:{r:5,c:c0},filtro:G.itens.length?`A5:F${5+G.itens.length}`:null,itens:[]});
     }
     /* 5. Demandas */
-    {const nome="Demandas";const rows=[[{v:"Demandas do período",s:ST.titulo}],[{v:`Abertas ou concluídas no período e todas em andamento · ${R.per.rotulo}`,s:ST.sub}],null];
-     const cab=["Código","Dimensão","Serviço","Título","Origem","Solicitante","Unidade","Parceiro","Responsável","Situação","Etapa atual","Aberta em","Previsão","Concluída em","Dias úteis"];
+    {const nome="Demandas";const rows=[[{v:"Demandas do período",s:ST.titulo}],[{v:`Abertas, concluídas ou canceladas no período e todas em andamento · ${R.per.rotulo}`,s:ST.sub}],null];
+     const cab=["Código","Dimensão","Serviço","Título","Origem","Solicitante","Unidade","Parceiro","Responsável","Situação","Etapa atual","Aberta em","Previsão","Concluída em","Dias úteis","Motivo do cancelamento"];
      rows[3]=cab.map(v=>({v,s:ST.cab}));
      R.lista.forEach((d,i)=>{const sk={ok:ST.ok,bad:ST.bad,warn:ST.warn,info:ST.info,mut:ST.txt}[d.sitK]||ST.txt;
-       rows[4+i]=[{v:d.cod,s:ST.txt},{v:d.dim,s:ST.txt},{v:d.servico,s:ST.txt},{v:d.titulo,s:ST.wrap},{v:d.origem,s:ST.txt},{v:d.solicitante,s:ST.txt},{v:d.unidade,s:ST.txt},{v:d.parceiro,s:ST.txt},{v:d.responsavel,s:ST.txt},{v:d.situacao,s:sk},{v:d.etapa,s:ST.txt},{v:serial(d.criadoEm),s:ST.data},{v:serial(d.prazo),s:ST.data},{v:d.concluidaEm?serial(d.concluidaEm):null,s:ST.data},{v:d.du,s:ST.int}]});
-     sheets.push({nome,rows,cols:[15,22,34,44,12,22,24,24,22,20,28,12,12,13,10],filtro:`A4:O${4+R.lista.length}`,congelar:{r:4,c:1},alturas:{0:26,3:30},itens:[]});
+       rows[4+i]=[{v:d.cod,s:ST.txt},{v:d.dim,s:ST.txt},{v:d.servico,s:ST.txt},{v:d.titulo,s:ST.wrap},{v:d.origem,s:ST.txt},{v:d.solicitante,s:ST.txt},{v:d.unidade,s:ST.txt},{v:d.parceiro,s:ST.txt},{v:d.responsavel,s:ST.txt},{v:d.situacao,s:sk},{v:d.etapa,s:ST.txt},{v:serial(d.criadoEm),s:ST.data},{v:serial(d.prazo),s:ST.data},{v:d.concluidaEm?serial(d.concluidaEm):null,s:ST.data},{v:d.du,s:ST.int},{v:d.motivo,s:ST.wrap}]});
+     sheets.push({nome,rows,cols:[15,22,34,44,12,22,24,24,22,20,28,12,12,13,10,40],filtro:`A4:P${4+R.lista.length}`,congelar:{r:4,c:1},alturas:{0:26,3:30},itens:[]});
     }
     /* 6. Impactos */
     {const nome="Carteira de impactos";const rows=[[{v:"Carteira de impactos",s:ST.titulo}],[{v:"Ativos em ciclos de avaliação, monitoramentos de adoção e estudos de impacto",s:ST.sub}],null];
@@ -265,10 +265,10 @@ const Export = (()=>{
     }
     /* visão geral */
     {const s=p.addSlide({masterName:"SPAT"});titulo(s,"Visão geral do período",R.destaque);
-     const k=[[R.tot.rec,"Demandas recebidas",COR.azul],[R.tot.con,"Entregas concluídas",COR.verde],[pct(R.tot.prazo),"Concluídas no prazo",COR.verde],[R.tot.and,`Em andamento hoje · ${R.tot.atr} atrasada(s)`,R.tot.atr?COR.verm:COR.azul]];
+     const k=[[R.tot.rec,`Demandas recebidas${R.tot.can?` · ${R.tot.can} cancelada(s)`:""}`,COR.azul],[R.tot.con,"Entregas concluídas",COR.verde],[pct(R.tot.prazo),"Concluídas no prazo",COR.verde],[R.tot.and,`Em andamento hoje · ${R.tot.atr} atrasada(s)`,R.tot.atr?COR.verm:COR.azul]];
      k.forEach(([v,l,c],i)=>card(s,0.5+i*3.1,1.5,2.9,1.25,v,l,c));
-     s.addChart(p.ChartType.bar,[{name:"Recebidas",labels:R.dims.map(x=>x.d.curto),values:R.dims.map(x=>x.rec.length)},{name:"Concluídas",labels:R.dims.map(x=>x.d.curto),values:R.dims.map(x=>x.con.length)}],
-       {x:0.5,y:3.0,w:W-1,h:3.95,barDir:"col",barGrouping:"clustered",barGapWidthPct:60,chartColors:[COR.azul,COR.verde],...eixo,showTitle:true,title:"Recebidas e concluídas por dimensão",titleFontSize:13,titleColor:COR.azul});
+     s.addChart(p.ChartType.bar,[{name:"Recebidas",labels:R.dims.map(x=>x.d.curto),values:R.dims.map(x=>x.rec.length)},{name:"Concluídas",labels:R.dims.map(x=>x.d.curto),values:R.dims.map(x=>x.con.length)},{name:"Canceladas",labels:R.dims.map(x=>x.d.curto),values:R.dims.map(x=>x.can.length)}],
+       {x:0.5,y:3.0,w:W-1,h:3.95,barDir:"col",barGrouping:"clustered",barGapWidthPct:60,chartColors:[COR.azul,COR.verde,COR.cinza],...eixo,showTitle:true,title:"Recebidas, concluídas e canceladas por dimensão",titleFontSize:13,titleColor:COR.azul});
     }
     /* evolução mensal */
     if(R.mensal.length>1){const s=p.addSlide({masterName:"SPAT"});titulo(s,"Evolução mensal","Demandas recebidas e entregas concluídas mês a mês");
@@ -280,7 +280,7 @@ const Export = (()=>{
     /* uma por dimensão */
     R.dims.forEach(x=>{const s=p.addSlide({masterName:"SPAT"});
       titulo(s,x.d.nome,x.d.desc);
-      const mets=[[x.rec.length,"Recebidas no período"],[x.con.length,"Entregas concluídas"],[pct(x.prazo),"Concluídas no prazo"],[x.tempo==null?"—":x.tempo+" d.u.","Tempo médio de atendimento"],[x.and.length,`Em andamento hoje${x.atr?` · ${x.atr} atrasada(s)`:""}`]];
+      const mets=[[x.rec.length,`Recebidas no período${x.can.length?` · ${x.can.length} cancelada(s)`:""}`],[x.con.length,"Entregas concluídas"],[pct(x.prazo),"Concluídas no prazo"],[x.tempo==null?"—":x.tempo+" d.u.","Tempo médio de atendimento"],[x.and.length,`Em andamento hoje${x.atr?` · ${x.atr} atrasada(s)`:""}`]];
       mets.forEach(([v,l],i)=>card(s,0.5,1.55+i*1.06,3.3,0.96,v,l,i===4&&x.atr?COR.verm:i===0?COR.azul:COR.verde));
       const ts=x.tipos;
       if(ts.some(t=>t.rec||t.con||t.and)) s.addChart(p.ChartType.bar,[{name:"Concluídas",labels:ts.map(t=>t.t.ind),values:ts.map(t=>t.con)},{name:"Em andamento",labels:ts.map(t=>t.t.ind),values:ts.map(t=>t.and)}],

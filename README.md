@@ -21,7 +21,8 @@ Esta versão roda como site estático no **GitHub Pages** e guarda os dados no *
 | `js/marca.js` | Marcas oficiais Embrapa (colorida, negativa, preta) incorporadas |
 | `css/styles.css` | Identidade visual (cores Embrapa) |
 | `supabase/schema.sql` | Tabelas, anexos, avisos, gatilhos e regras de acesso (RLS) |
-| `supabase/email.sql` | Ativação do envio de e-mails e dos lembretes diários |
+| `supabase/email.sql` | Ativação do envio de e-mails e do resumo semanal |
+| `supabase/atualizar-*.sql` | Atualizações para instalações já existentes (rodar uma vez cada) |
 | `assets/` | Marcas Embrapa em PNG e ícone |
 | `.github/workflows/pages.yml` | Publicação automática no GitHub Pages |
 
@@ -55,6 +56,14 @@ Esta versão roda como site estático no **GitHub Pages** e guarda os dados no *
 - **Pendência com o solicitante:** "Aguardar solicitante" exige descrever o que falta. O solicitante é avisado; quando ele responde por mensagem ou anexo, o responsável é avisado.
 - **Sino de notificações:** cada pessoa vê suas pendências (alocação, manifestação, aprovação, entrega) e as atualizações recentes. Na instalação própria, é possível ativar alertas do navegador.
 
+## Cancelar, excluir e reiniciar
+
+- **Cancelar** (solicitante, membro do SPAT ou supervisor): exige motivo e vale para demandas em qualquer etapa. A demanda continua no sistema e **conta nos indicadores** como cancelada, com o motivo na planilha exportada. O solicitante (ou o responsável) recebe aviso por e-mail. O supervisor pode reabrir.
+- **Excluir** (supervisor ou o próprio solicitante): só aparece enquanto a demanda está na etapa de recebimento. Apaga a demanda e os anexos, sem motivo, e ela **não entra nos indicadores**. A partir da etapa seguinte, só é possível cancelar.
+- **Reiniciar o sistema** (supervisor, em Configurações): apaga todas as demandas, anexos e avisos. Pessoas cadastradas e perfis são mantidos. Opcionalmente, restaura prazos, serviços oferecidos e metas para o padrão. Exige digitar REINICIAR.
+
+**Instalação já existente:** execute uma vez `supabase/atualizar-cancelar-excluir-reiniciar.sql` no SQL Editor e substitua `js/app.js`, `js/store-supabase.js`, `js/export.js` e `css/styles.css`. Instalações novas recebem tudo pelo `schema.sql`.
+
 ## Notificações por e-mail (opcional, recomendado)
 
 O `schema.sql` já registra cada aviso na tabela `notificacoes`. Para que eles também cheguem por e-mail:
@@ -67,16 +76,16 @@ O `schema.sql` já registra cada aviso na tabela `notificacoes`. Para que eles t
 
 | Aviso | Quem recebe |
 |---|---|
-| Nova demanda sem responsável e resumo diário | Supervisores |
+| Nova demanda sem responsável e resumo semanal (segundas) | Supervisores |
 | Demanda atribuída | Responsável |
 | Solicitação recebida | Solicitante |
-| O SPAT aguarda sua manifestação e lembrete a cada 3 dias | Solicitante |
+| O SPAT aguarda sua manifestação (no momento da pendência) | Solicitante |
 | O solicitante respondeu ou enviou mensagem | Responsável |
 | Nova mensagem do SPAT | Solicitante |
 | Aprovação pendente | Chefe de TT e Chefe-Geral |
 | Entrega disponível, com SEI, links e arquivos | Solicitante |
 
-Os lembretes diários rodam de segunda a sexta às 7h (horário de Cuiabá). E-mails para o domínio institucional podem cair no spam nos primeiros envios; peça aos usuários que marquem o remetente como confiável.
+O resumo semanal sai às segundas-feiras, às 7h (horário de Cuiabá), com as demandas sem responsável e as que aguardam o solicitante. E-mails para o domínio institucional podem cair no spam nos primeiros envios; peça aos usuários que marquem o remetente como confiável.
 
 ## Segurança
 - A chave publicável é pública por desenho do Supabase. O que protege os dados são as regras de `schema.sql`:
