@@ -39,6 +39,21 @@ window.Store = (()=>{
     async salvarCadastro(b){const {error}=await sb.from("perfis").upsert({id:me.id,nome:b.nome,email:b.email,matricula:b.matricula,setor:b.setor,cargo:b.cargo,ramal:b.ramal,papel_solicitado:b.papelSolicitado,justificativa:b.justificativa});err(error)},
     async definirAcesso(id,o){const u={status:o.status};if(o.papel!==undefined)u.papel=o.papel;const {error}=await sb.from("perfis").update(u).eq("id",id);err(error)},
     nomes:null,
+    podeAnexar:true, tiposAnexo:"", notaAnexo:"Qualquer formato, até 50 MB por arquivo.", emailDisponivel:true,
+    async anexar(did,file){
+      if(file.size>50*1024*1024) throw new Error("Arquivo acima de 50 MB. Use um link do Google Drive.");
+      const limpo=file.name.normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^\w.\-]+/g,"_").slice(-120);
+      const path=`${did}/${Date.now()}-${limpo}`;
+      const {error}=await sb.storage.from("anexos").upload(path,file,{contentType:file.type||"application/octet-stream",upsert:false});
+      if(error) throw new Error(/bucket/i.test(error.message)?"O armazenamento de anexos não está configurado. Execute novamente o supabase/schema.sql.":error.message);
+      return {ref:path};
+    },
+    async abrirAnexo(a){
+      const {data,error}=await sb.storage.from("anexos").createSignedUrl(a.ref,300,{download:a.nome});
+      if(error) throw new Error(error.message);
+      const el=document.createElement("a");el.href=data.signedUrl;el.rel="noopener";document.body.appendChild(el);el.click();el.remove();
+    },
+    async testarEmail(){const {data,error}=await sb.rpc("spat_teste_email");if(error)throw new Error(error.message);return data},
     uploadLogo:null,
     async baixar(nome,blob){const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=nome;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),2000)}
   };

@@ -37,7 +37,7 @@ function avatarHtml(id){const a=S.prof[id]?.avatar;return a?`<img src="${esc(a)}
 function situacao(d){
   if(d.status==="concluida") return {k:"ok",t:"Concluída"};
   if(d.status==="cancelada") return {k:"mut",t:"Cancelada"};
-  if(d.status==="aguardando") return {k:"info",t:"Aguardando solicitante"};
+  if(d.status==="aguardando") return d.respondido?{k:"warn",t:"Solicitante respondeu"}:{k:"info",t:"Aguardando solicitante"};
   if(d.status==="planejada") return dia(d.inicio)<=hoje()?{k:"warn",t:`Iniciar (previsto ${fmt(d.inicio)})`}:{k:"mut",t:`Planejada · início ${fmt(d.inicio)}`};
   const rest = du(hoje(), d.prazo);
   if(rest<0) return {k:"bad",t:`Atrasada ${-rest} d.u.`};
@@ -101,7 +101,7 @@ function linha(d){
   const s=situacao(d); const T=TIPOS[d.tipo];
   return `<a class="r" href="#d-${esc(d.id)}">
     <div class="c1 mono">${esc(d.cod)}</div>
-    <div style="min-width:0"><div class="t">${novidade(d)?'<span class="dot" title="Atualização nova"></span>':""}${esc(d.titulo)}${d.exemplo?' <span class="tag">exemplo</span>':""}</div>
+    <div style="min-width:0"><div class="t">${novidade(d)?'<span class="dot" title="Atualização nova"></span>':""}${esc(d.titulo)}${d.exemplo?' <span class="tag">exemplo</span>':""}${d.status==="concluida"&&(d.anexos||[]).some(a=>a.entrega)?' <span class="tag ent">entrega</span>':""}</div>
       <div class="s">${esc(T.nome)} · ${esc(etapaAtual(d))}${d.origem==="interna"?" · ação interna":""}</div></div>
     <div class="c3 s">${esc(nome(d.responsavel))}</div>
     <div class="c4"><div class="s mono">${fmt(d.prazo)}</div><div class="bar"><i style="width:${progresso(d)}%"></i></div></div>
@@ -161,6 +161,7 @@ function telaInicio(){
   if(!seesAll()){
     const ab=v.filter(ativaD), fe=v.filter(d=>d.status==="concluida").slice(0,6);
     return `<div class="head"><div><h1>Minhas solicitações ao SPAT</h1><p>Acompanhe cada pedido, a etapa em que está e quando deve ficar pronto.</p></div><a class="btn pri" href="#nova">Nova solicitação</a></div>
+      ${bannerPendencias()}
       ${ab.length?`<div class="cards">${ab.map(cartao).join("")}</div>`:`<div class="panel">${vazio("Nenhuma solicitação em andamento","Peça um relatório de prospecção, um parecer do CLPI, um instrumento contratual ou outro serviço. Você vê o prazo estimado antes de enviar.",'<a class="btn pri" href="#nova">Fazer uma solicitação</a>')}</div>`}
       ${fe.length?`<div class="panel flush"><div class="sec-t"><h2>Concluídas recentemente</h2></div>${fe.map(linha).join("")}</div>`:""}`;
   }
@@ -178,6 +179,7 @@ function telaInicio(){
   const pend=Object.values(S.perfis).filter(p=>p.status==="pendente").length;
   const porDim=DIMS.map(d=>[d,at.filter(x=>TIPOS[x.tipo].dim===d.id).length]); const mx=Math.max(1,...porDim.map(x=>x[1]));
   return `<div class="head"><div><h1>Painel do SPAT</h1><p>${ROLES[role()]} · ${new Date().toLocaleDateString("pt-BR",{weekday:"long",day:"numeric",month:"long"})}</p></div><a class="btn pri" href="#nova">Nova solicitação</a></div>
+   ${bannerPendencias()}
    ${isSup()&&pend?`<div class="banner"><b>${pend}</b> cadastro(s) aguardando validação. <a href="#cadastros">Validar agora</a></div>`:""}
    ${S.demandas.length===0?`<div class="note">A base ainda está vazia. As demandas aparecem aqui quando alguém fizer a primeira solicitação.${isSup()?' Para testar o fluxo, insira demandas de exemplo em <a href="#config">Configurações</a>.':""}</div>`:""}
    <div class="kpis">
@@ -264,6 +266,125 @@ function telaNova(){
   </form>`:""}`;
 }
 
+/* ---------- Anexos, links e processos SEI ---------- */
+const ehUrl=u=>/^https?:\/\/[^\s]+$/i.test(u||"");
+function origemLink(u){try{const h=new URL(u).hostname;if(/drive\.google|docs\.google/.test(h))return "Google Drive";if(/sharepoint|onedrive|office/.test(h))return "SharePoint / OneDrive";if(/(^|\.)sei\.|\/sei/.test(h))return "SEI";return h.replace(/^www\./,"")}catch(e){return "Link"}}
+const tamanho=b=>b==null?"":b<1024*1024?Math.max(1,Math.round(b/1024))+" KB":(b/1048576).toFixed(1).replace(".",",")+" MB";
+const extensao=n=>((n||"").split(".").pop()||"").slice(0,4).toUpperCase();
+function itemAnexo(a,i,d){
+  const por=`${esc(nome(a.por))} · ${fmtH(a.em)}`;
+  const rm=(isSup()||a.por===S.me.id)&&!S.readOnly?`<button class="btn sm" data-rmanexo="${i}" title="Remover">Remover</button>`:"";
+  if(a.tipo==="sei") return `<div class="anx"><span class="atag sei">SEI</span><div class="ai"><b>Processo SEI nº <span class="mono">${esc(a.sei)}</span></b><small>${a.nome?esc(a.nome)+" · ":""}${por}</small></div><button class="btn sm" data-copiar="${esc(a.sei)}">Copiar número</button>${rm}</div>`;
+  if(a.tipo==="link") return `<div class="anx"><span class="atag lnk">LINK</span><div class="ai"><a href="${esc(a.url)}" target="_blank" rel="noopener"><b>${esc(a.nome||origemLink(a.url))}</b></a><small>${esc(origemLink(a.url))} · ${por}</small></div><a class="btn sm" href="${esc(a.url)}" target="_blank" rel="noopener">Abrir</a>${rm}</div>`;
+  return `<div class="anx"><span class="atag">${esc(extensao(a.nome)||"ARQ")}</span><div class="ai"><b>${esc(a.nome)}</b><small>${tamanho(a.tam)} · ${por}</small></div><button class="btn sm" data-baixar="${i}">Baixar</button>${rm}</div>`;
+}
+function painelAnexos(d){
+  const L=(d.anexos||[]).map((a,i)=>({a,i}));
+  const ent=L.filter(x=>x.a.entrega), out=L.filter(x=>!x.a.entrega);
+  const modo=S.axModo;
+  const add=S.readOnly||d.status==="cancelada"?"":`<div class="anx-add">
+    <div class="row"><label class="btn sm" for="ax-file" ${Store.podeAnexar?"":'hidden'}>Anexar arquivo</label><input type="file" id="ax-file" multiple hidden ${Store.tiposAnexo?`accept="${Store.tiposAnexo}"`:""}><button class="btn sm" data-axmodo="link">Adicionar link</button><button class="btn sm" data-axmodo="sei">Informar processo SEI</button></div>
+    ${modo==="link"?`<div class="row"><input id="ax-url" class="inp" type="url" placeholder="https://drive.google.com/…" style="flex:2 1 260px"><input id="ax-rot" class="inp" placeholder="Descrição (opcional)" style="flex:1 1 160px"><button class="btn sm pri" data-act="ax-link">Adicionar</button></div>`:""}
+    ${modo==="sei"?`<div class="row"><input id="ax-sei" class="inp mono" placeholder="00000.000000/0000-00" style="flex:1 1 200px"><input id="ax-seirot" class="inp" placeholder="Assunto (opcional)" style="flex:2 1 200px"><button class="btn sm pri" data-act="ax-sei">Adicionar</button></div>`:""}
+    <small class="muted">${esc(Store.notaAnexo||"")}${isTeam()?" Itens marcados como entrega aparecem em destaque para o solicitante.":""}</small>
+    ${isTeam()&&d.solicitante!==S.me.id?`<label style="font-size:.85rem"><input type="checkbox" id="ax-ent"> Marcar como entrega ao solicitante</label>`:""}
+  </div>`;
+  return `<div class="panel"><div class="sec-t"><h2>Anexos e links</h2><span class="muted">${L.length}</span></div>
+    ${ent.length&&d.status!=="concluida"?`<div class="lbl" style="margin:4px 0 6px">Entrega</div>${ent.map(x=>itemAnexo(x.a,x.i,d)).join("")}<div class="lbl" style="margin:12px 0 6px">Outros</div>`:""}
+    ${out.map(x=>itemAnexo(x.a,x.i,d)).join("")||(ent.length?(d.status==="concluida"?`<p class="muted" style="margin:0 0 10px;font-size:.88rem">Os itens da entrega estão no quadro verde acima.</p>`:""):`<p class="muted" style="margin:0 0 10px;font-size:.88rem">Nenhum arquivo, link ou processo SEI ainda.</p>`)}
+    ${add}</div>`;
+}
+function painelEntrega(d){
+  const ent=(d.anexos||[]).map((a,i)=>({a,i})).filter(x=>x.a.entrega);
+  if(d.status!=="concluida"||(!ent.length&&!d.entrega)) return "";
+  return `<div class="panel ok-panel"><div class="sec-t"><h2>${d.solicitante===S.me.id?"Seu trabalho está pronto":"Entrega ao solicitante"}</h2><span class="muted">${d.entrega?fmtH(d.entrega.em):fmt(d.concluidaEm)}</span></div>
+    ${d.entrega?.obs?`<div class="x" style="white-space:pre-wrap;margin-bottom:10px">${esc(d.entrega.obs)}</div>`:""}
+    ${ent.map(x=>itemAnexo(x.a,x.i,d)).join("")||`<p class="muted" style="margin:0">Entrega registrada sem anexo.</p>`}</div>`;
+}
+function formEntrega(d,T){
+  const sei=(d.anexos||[]).find(a=>a.tipo==="sei");
+  return `<form class="panel form-entrega" id="fentrega"><div class="sec-t"><h2>${T.fimManual?"Registrar assinatura e entregar":"Concluir e entregar"}</h2></div>
+   <p class="muted" style="margin:0 0 12px;font-size:.9rem">${d.origem==="interna"?"Registre o resultado desta ação interna.":"O solicitante recebe o aviso com o que você informar aqui."} Informe pelo menos um: processo SEI, link ou arquivo.</p>
+   <div class="form">
+    <div class="fld"><label for="e-sei">Processo SEI</label><input id="e-sei" class="mono" placeholder="00000.000000/0000-00" value="${esc(sei?.sei||"")}"></div>
+    <div class="fld"><label for="e-arq">Arquivos</label><input id="e-arq" type="file" multiple ${Store.podeAnexar?"":"disabled"} ${Store.tiposAnexo?`accept="${Store.tiposAnexo}"`:""}><small>${esc(Store.notaAnexo||"")}</small></div>
+    <div class="fld"><label for="e-link">Link (Google Drive, SharePoint…)</label><input id="e-link" type="url" placeholder="https://drive.google.com/…"></div>
+    <div class="fld"><label for="e-linkrot">Descrição do link</label><input id="e-linkrot" placeholder="Ex.: Pasta com o relatório final"></div>
+    <div class="fld full"><label for="e-msg">Mensagem ao solicitante</label><textarea id="e-msg" style="min-height:80px" placeholder="Resumo do que foi entregue e próximos passos"></textarea></div>
+    <label class="fld full" style="flex-direction:row;gap:8px;align-items:center;font-size:.88rem"><input type="checkbox" id="e-sem"> Concluir sem anexo (o resultado está descrito na mensagem)</label>
+   </div>
+   <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button type="button" class="btn" data-act="fechar-form">Cancelar</button><button class="btn pri" id="e-ok">Concluir e avisar o solicitante</button></div></form>`;
+}
+function formPausa(){
+  return `<div class="acts"><label class="lbl" for="p-txt">O que o solicitante precisa enviar ou decidir?</label><textarea id="p-txt" class="inp" style="min-height:90px" placeholder="Ex.: Enviar o plano de trabalho assinado pelo parceiro"></textarea>
+   <div class="row"><button class="btn sm" data-act="fechar-form">Cancelar</button><button class="btn sm pri" data-act="pausar2">Suspender prazo e avisar</button></div></div>`;
+}
+
+/* ---------- Central de avisos ---------- */
+const lidoKey=()=>`spat-lido-${S.me?.id}`;
+function lido(){try{const v=localStorage.getItem(lidoKey());if(v)return v}catch(e){}return S.lidoMem||new Date(Date.now()-7*864e5).toISOString()}
+function marcarLido(){const v=new Date().toISOString();S.lidoMem=v;try{localStorage.setItem(lidoKey(),v)}catch(e){}}
+function avisos(){
+  const pend=[],nov=[]; if(!S.me||!role()) return {pend,nov,novos:0};
+  const me=S.me.id, sol=role()==="solicitante";
+  const P=(d,t,k)=>pend.push({d,t,k});
+  for(const d of visiveis()){
+    if(d.status==="cancelada") continue;
+    if(d.solicitante===me&&d.origem!=="interna"&&d.status==="aguardando"&&!d.respondido) P(d,"Aguardando sua manifestação","warn");
+    if(d.solicitante===me&&d.status==="concluida"&&(d.anexos||[]).some(a=>a.entrega)&&!(seen[d.id]&&seen[d.id]>=(d.entrega?.em||d.concluidaEm))) P(d,"Entrega disponível","ok");
+    if(isSup()&&d.status==="aberta"&&!d.responsavel) P(d,"Aguardando alocação de responsável","bad");
+    if(isTeam()&&d.status==="aguardando"&&d.respondido&&(d.responsavel===me||(!d.responsavel&&isSup()))) P(d,"Solicitante respondeu à pendência","warn");
+    if(isChefe()&&d.status==="aberta"&&etAprov(TIPOS[d.tipo].etapas[d.etapa])) P(d,"Aguarda sua aprovação","info");
+    if(isTeam()&&d.status==="planejada"&&(d.responsavel===me||(!d.responsavel&&isSup()))&&dia(inicioD(d))<=hoje()) P(d,"Ação planejada: hora de iniciar","info");
+    if(isTeam()&&d.responsavel===me&&atrasadaD(d)) P(d,"Prazo vencido","bad");
+    const rel=d.solicitante===me||d.responsavel===me||(isSup()&&!d.responsavel);
+    if(!rel) continue;
+    for(const h of (d.historico||[])){ if(h.por===me) continue; if(h.interna&&sol) continue; nov.push({d,h}); }
+  }
+  nov.sort((a,b)=>a.h.em<b.h.em?1:-1);
+  const L=lido(); const novos=nov.filter(n=>n.h.em>L).length;
+  return {pend,nov:nov.slice(0,25),novos,L};
+}
+function renderSino(){
+  const b=$("sino"); if(!b) return;
+  if(!S.me||!role()){b.hidden=true;return}
+  const A=avisos(); const n=A.pend.length+A.novos; b.hidden=false;
+  b.querySelector(".badge").textContent=n>99?"99+":String(n); b.querySelector(".badge").hidden=!n;
+  b.setAttribute("aria-label",`Notificações: ${n}`);
+  try{document.title=(n?`(${n}) `:"")+"Gestão SPAT"}catch(e){}
+  // alerta do navegador para itens novos (instalação própria)
+  const chaves=new Set([...A.pend.map(p=>p.d.id+p.t),...A.nov.filter(x=>x.h.em>A.L).map(x=>x.d.id+x.h.em)]);
+  if(S.chavesAviso&&Store.mode==="supabase"&&"Notification" in window&&Notification.permission==="granted"){
+    const novas=[...A.pend.filter(p=>!S.chavesAviso.has(p.d.id+p.t)).map(p=>[p.t,p.d.titulo]),...A.nov.filter(x=>x.h.em>A.L&&!S.chavesAviso.has(x.d.id+x.h.em)).map(x=>[x.h.t,x.d.titulo])];
+    novas.slice(0,3).forEach(([t,c])=>{try{new Notification("SPAT: "+t.slice(0,80),{body:c})}catch(e){}});
+  }
+  S.chavesAviso=chaves;
+  const pn=$("notif"); if(pn&&!pn.hidden) pn.innerHTML=painelAvisos(A);
+}
+function painelAvisos(A){
+  const pend=A.pend.map(p=>`<a class="nt-i" href="#d-${esc(p.d.id)}"><span class="pill ${p.k}">${esc(p.t)}</span><b>${esc(p.d.titulo)}</b><small class="mono">${esc(p.d.cod)}</small></a>`).join("");
+  const nov=A.nov.map(x=>`<a class="nt-i ${x.h.em>A.L?"novo":""}" href="#d-${esc(x.d.id)}"><b>${esc(x.d.titulo)}</b><span class="nt-t">${esc((x.h.tipo==="comentario"?nome(x.h.por)+": ":"")+x.h.t).slice(0,160)}</span><small>${fmtH(x.h.em)}</small></a>`).join("");
+  const alerta=Store.mode==="supabase"&&"Notification" in window&&Notification.permission==="default"?`<button class="btn sm" id="nt-alerta">Ativar alertas no navegador</button>`:"";
+  return `<div class="nt-h"><b>Notificações</b><button class="btn sm" id="nt-lidas">Marcar como lidas</button></div>
+   <div class="nt-sec">Pendências <span>${A.pend.length}</span></div>${pend||`<p class="nt-v">Nenhuma pendência com você.</p>`}
+   <div class="nt-sec">Atualizações</div>${nov||`<p class="nt-v">Sem atualizações recentes.</p>`}
+   <div class="nt-f">${alerta}<small>${Store.emailDisponivel?"Os avisos principais também chegam por e-mail, quando configurado pelo SPAT.":"Os avisos aparecem aqui sempre que você abrir o sistema."}</small></div>`;
+}
+function abrirAvisos(){
+  const pn=$("notif"), b=$("sino"); if(!pn) return;
+  if(!pn.hidden){pn.hidden=true;b.setAttribute("aria-expanded","false");return}
+  pn.innerHTML=painelAvisos(avisos()); pn.hidden=false; b.setAttribute("aria-expanded","true");
+  pn.onclick=e=>{const a=e.target.closest("a.nt-i");if(a){pn.hidden=true;b.setAttribute("aria-expanded","false")}
+    if(e.target.id==="nt-lidas"){marcarLido();renderSino();render()}
+    if(e.target.id==="nt-alerta"){Notification.requestPermission().then(()=>{pn.innerHTML=painelAvisos(avisos())})}};
+}
+function bannerPendencias(){
+  const A=avisos(); if(!A.pend.length) return "";
+  const g={}; A.pend.forEach(p=>{(g[p.t]=g[p.t]||[]).push(p)});
+  return `<div class="avisos">${Object.entries(g).map(([t,l])=>{const k=l[0].k;const alvo=l.length===1?`#d-${esc(l[0].d.id)}`:"";
+    return `<div class="aviso ${k}"><b>${l.length}</b><span>${esc(t)}${l.length===1?`: ${esc(l[0].d.titulo)}`:""}</span>${alvo?`<a class="btn sm" href="${alvo}">Abrir</a>`:`<button class="btn sm" data-pendgo="${esc(t)}">Ver ${l.length}</button>`}</div>`}).join("")}</div>`;
+}
+
 /* ---------- Detalhe ---------- */
 function linkify(t){return esc(t).replace(/(https?:\/\/[^\s,;]+)/g,'<a href="$1" target="_blank" rel="noopener">$1</a>')}
 function telaDetalhe(id){
@@ -272,8 +393,9 @@ function telaDetalhe(id){
   if(!seesAll()&&d.solicitante!==S.me.id) return vazio("Sem acesso a esta demanda","Solicitantes veem apenas os próprios pedidos.",'<a class="btn" href="#inicio">Voltar</a>');
   const T=TIPOS[d.tipo]; const s=situacao(d); const et=T.etapas; const ativa=ativaD(d);
   const cur=et[d.etapa], prox=et[d.etapa+1];
-  const podeAvancar = ativa && d.status==="aberta" && prox!==undefined && (etAprov(cur)? isChefe() : isTeam());
-  const podeConcluir = ativa && d.status==="aberta" && prox===undefined && isTeam();
+  const direto = ativa && d.status==="aberta" && isTeam() && !T.fimManual && d.etapa===et.length-2 && !etAprov(cur);
+  const podeAvancar = ativa && d.status==="aberta" && prox!==undefined && !direto && (etAprov(cur)? isChefe() : isTeam());
+  const podeConcluir = (ativa && d.status==="aberta" && prox===undefined && isTeam()) || direto;
   const hist=(d.historico||[]).filter(h=>!(h.interna&&role()==="solicitante"));
   const decorrido=d.status==="planejada"?0:du(inicioD(d), d.concluidaEm||hoje());
   const stepsHtml=et.map((e,i)=>{const done=d.status==="concluida"||i<d.etapa;const c=!done&&i===d.etapa&&d.status!=="cancelada";const dt=(d.etapasDatas||[])[i];
@@ -284,19 +406,24 @@ function telaDetalhe(id){
   if(isTeam()&&(ativa||planj)) acoes.push(`<div class="row"><select id="d-resp" aria-label="Responsável"><option value="">Sem responsável</option>${equipeIds().map(i=>`<option value="${esc(i)}" ${d.responsavel===i?"selected":""}>${esc(nome(i))}</option>`).join("")}</select>${d.responsavel!==S.me.id?`<button class="btn sm" data-act="assumir">Assumir</button>`:""}</div>`);
   if(podeAvancar) acoes.push(`<button class="btn pri" data-act="avancar">${etAprov(cur)?"Aprovar e seguir":"Avançar"} para: ${esc(etN(prox))}</button>`);
   else if(ativa&&d.status==="aberta"&&etAprov(cur)&&!isChefe()&&prox!==undefined) acoes.push(`<div class="note">Esta etapa depende da aprovação do Chefe de TT ou do Chefe-Geral.</div>`);
-  if(podeConcluir) acoes.push(`<button class="btn pri" data-act="concluir">${T.fimManual?"Registrar assinatura e concluir":"Concluir e entregar"}</button>`);
+  if(podeConcluir&&S.form!=="entrega") acoes.push(`<button class="btn pri" data-act="concluir">${T.fimManual?"Registrar assinatura e entregar":"Concluir e entregar"}</button>`);
   if(isTeam()&&ativa){
-    acoes.push(`<div class="row">${d.etapa>0&&d.status==="aberta"?`<button class="btn sm" data-act="voltar">Voltar etapa</button>`:""}${d.status==="aguardando"?`<button class="btn sm" data-act="retomar">Retomar atendimento</button>`:`<button class="btn sm" data-act="pausar" title="Suspende a contagem do prazo">Aguardar solicitante</button>`}</div>`);
+    acoes.push(`<div class="row">${d.etapa>0&&d.status==="aberta"?`<button class="btn sm" data-act="voltar">Voltar etapa</button>`:""}${d.status==="aguardando"?`<button class="btn sm${d.respondido?" pri":""}" data-act="retomar">Retomar atendimento</button>`:S.form==="pausa"?"":`<button class="btn sm" data-act="pausar" title="Suspende a contagem do prazo e avisa o solicitante">Aguardar solicitante</button>`}</div>`);
+    if(S.form==="pausa"&&d.status==="aberta") acoes.push(formPausa());
   }
   if(isTeam()&&(ativa||planj)) acoes.push(`<div class="row"><input type="date" id="d-prazo" value="${String(d.prazo).slice(0,10)}" aria-label="Nova data prevista"><button class="btn sm" data-act="prazo">${planj?"Ajustar término":"Ajustar prazo"}</button></div>`);
   if((ativa||planj)&&(isSup()||(d.solicitante===S.me.id&&d.etapa===0))) acoes.push(`<button class="btn sm danger" data-act="cancelar" style="align-self:flex-start">Cancelar demanda</button><div id="confcancel"></div>`);
   if(!ativa&&isSup()) acoes.push(`<button class="btn sm" data-act="reabrir" style="align-self:flex-start">Reabrir</button>`);
   return `<div><a href="#demandas" class="muted" style="font-size:.88rem">← ${seesAll()?"Demandas":"Minhas solicitações"}</a></div>
   <div class="head"><div style="min-width:0"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px"><span class="tag">${esc(d.cod)}</span><span class="dimtag">${esc(dimDe(d.tipo).curto)}</span><span class="pill ${s.k}">${s.t}</span>${d.urgencia==="alta"?'<span class="pill bad">Urgência alta</span>':""}${d.origem==="interna"?'<span class="pill mut">Ação interna</span>':""}${d.exemplo?'<span class="tag">exemplo</span>':""}</div><h1>${esc(d.titulo)}</h1><p>${esc(T.nome)} · etapa ${Math.min(d.etapa+1,et.length)} de ${et.length}: <b style="color:var(--ink)">${esc(etapaAtual(d))}</b></p></div></div>
+  ${d.status==="aguardando"?`<div class="aviso-dem ${d.respondido?"ok":"warn"}"><b>${d.respondido?"O solicitante respondeu à pendência":d.solicitante===S.me.id?"O SPAT aguarda sua manifestação":"Aguardando o solicitante"}</b>${d.pendencia?`<div class="x">${esc(d.pendencia)}</div>`:""}<small>${d.respondido?(isTeam()?"Confira a resposta no histórico e retome o atendimento.":"A equipe foi avisada e vai retomar o atendimento."):d.solicitante===S.me.id?"Responda pela caixa de mensagem ou anexe o documento pedido. O prazo está suspenso e a equipe é avisada quando você responder.":`Prazo suspenso desde ${fmt(d.pausadoEm)}.`}</small></div>`:""}
+  ${S.form==="entrega"&&podeConcluir?formEntrega(d,T):""}
+  ${painelEntrega(d)}
   <div class="det">
     <div class="col">
       <div class="panel"><div class="lbl" style="margin-bottom:8px">Descrição</div><div style="white-space:pre-wrap;overflow-wrap:anywhere">${esc(d.descricao)}</div>${d.links?`<div style="margin-top:10px;font-size:.88rem;overflow-wrap:anywhere"><span class="muted">Documentos:</span> ${linkify(d.links)}</div>`:""}</div>
       ${(d.ativos||[]).length?`<div class="panel"><div class="sec-t"><h2>Ativos</h2><span class="muted">${d.ativos.length}</span></div><div class="scroll"><table class="mini"><thead><tr><th>Ativo</th>${T.modo?"<th>Modo</th>":""}</tr></thead><tbody>${d.ativos.map(a=>`<tr><td>${esc(a.nome)}</td>${T.modo?`<td>${a.modo==="monitoramento"?"Monitoramento":"Avaliação"}</td>`:""}</tr>`).join("")}</tbody></table></div></div>`:""}
+      ${painelAnexos(d)}
       <div class="panel"><div class="sec-t"><h2>Histórico e mensagens</h2><span class="muted">${hist.length}</span></div>
         <div class="tl">${hist.slice().reverse().map(h=>h.tipo==="comentario"?`<div class="ev ${h.interna?"int":""}">${avatarHtml(h.por)}<div class="b"><div class="m"><b style="color:var(--ink)">${esc(nome(h.por))}</b><span>${fmtH(h.em)}</span>${h.interna?"<span>nota interna</span>":""}</div><div class="x">${esc(h.t)}</div></div></div>`:`<div class="ev sys"><span></span><div class="b"><div class="m"><span>${fmtH(h.em)}</span><span>${esc(nome(h.por))}</span></div><div>${esc(h.t)}</div></div></div>`).join("")}</div>
         ${S.readOnly?"":`<div class="comp"><label class="lbl" for="d-msg">${role()==="solicitante"?"Mensagem para a equipe do SPAT":"Nova mensagem"}</label><textarea id="d-msg" placeholder="${role()==="solicitante"?"Envie dúvidas, documentos ou informações complementares":"Escreva para o solicitante ou registre uma nota"}"></textarea>
@@ -455,6 +582,12 @@ function telaConfig(){
    <div class="panel"><div class="sec-t"><h2>Marca Embrapa</h2></div>
     <div class="logo-prev"><div class="pl"><img src="${esc(window.MARCA?MARCA.cor:"")}" alt="Marca Embrapa, versão colorida"></div><div class="pl neg"><img src="${esc(window.MARCA?MARCA.negativa:"")}" alt="Marca Embrapa, versão negativa"></div><div class="pl"><img src="${esc(window.MARCA?MARCA.preta:"")}" alt="Marca Embrapa, versão monocromática"></div></div>
     <p class="note" style="margin:12px 0 0">As três versões oficiais estão incorporadas ao sistema. A colorida aparece no cabeçalho, na planilha e na apresentação, sempre sobre fundo branco, com fio separador e o nome síntese da Unidade.</p></div>
+   <div class="panel"><div class="sec-t"><h2>Notificações</h2></div>
+    ${Store.emailDisponivel?`<p class="muted" style="margin:0 0 10px;font-size:.88rem">Os e-mails automáticos usam este endereço nos botões "Abrir no sistema".</p>
+     <div class="row" style="display:flex;gap:8px;flex-wrap:wrap"><input id="cfg-url" class="inp" style="flex:1 1 240px" value="${esc(S.cfg.sistema?.url||location.origin+location.pathname)}"><button class="btn sm" id="tcfg-url">Salvar</button></div>
+     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"><button class="btn sm" id="tcfg-email">Enviar e-mail de teste para mim</button></div>
+     <p class="note" style="margin:12px 0 0">E-mails enviados: nova demanda sem responsável (supervisores), demanda atribuída (responsável), pendência e lembretes (solicitante), resposta do solicitante (responsável), aprovação pendente (chefias) e entrega concluída (solicitante). A configuração do serviço de e-mail está no README, seção Notificações por e-mail.</p>`
+     :`<p class="note" style="margin:0">Nesta versão, os avisos aparecem no sino do sistema e no painel de cada pessoa. Avisos por e-mail estão disponíveis na instalação própria (GitHub e Supabase).</p>`}</div>
    <div class="panel"><div class="sec-t"><h2>Dados de exemplo</h2></div>
     <p class="muted" style="margin:0 0 12px;font-size:.88rem">Insere cinco demandas marcadas como exemplo, uma por dimensão, para treinar a equipe. Os indicadores ignoram exemplos por padrão.</p>
     <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="seed">Inserir exemplos</button><button class="btn danger" id="unseed" ${ex?"":"disabled"}>Remover ${ex} exemplo(s)</button></div></div>
@@ -486,12 +619,13 @@ async function render0(){
   else html=({nova:telaNova,servicos:telaServicos,demandas:telaLista,cronograma:telaCronograma,indicadores:telaIndicadores,impactos:telaImpactos,cadastros:telaCadastros,config:telaConfig}[r]||telaInicio)();
   const foco=document.activeElement?.id; let pos=null; try{pos=foco&&document.activeElement.selectionStart}catch(e){}
   const keep={}; if(r===S.lastRoute&&!S.noKeep) v.querySelectorAll("input[id],textarea[id]").forEach(el=>{if(el.id!=="fq"&&el.type!=="file")keep[el.id]=el.type==="checkbox"?el.checked:el.value});
+  if(r!==S.lastRoute){S.form=null;S.axModo=null}
   S.noKeep=false; S.lastRoute=r;
   v.innerHTML=banner+html;
   for(const [k,val] of Object.entries(keep)){const el=$(k);if(el){if(el.type==="checkbox")el.checked=val;else el.value=val}}
   if(foco&&$(foco)){$(foco).focus();try{if(pos!=null)$(foco).setSelectionRange(pos,pos)}catch(e){}}
   if(r.startsWith("d-")){const d=S.demandas.find(x=>x.id===r.slice(2));const h=d?.historico||[];if(d&&h.length&&seen[d.id]!==h[h.length-1].em){seen[d.id]=h[h.length-1].em;saveSeen()}}
-  bind();
+  bind(); renderSino();
 }
 
 /* ---------- Escrita ---------- */
@@ -499,6 +633,7 @@ function evento(t){return {em:new Date().toISOString(),por:S.me.id,t,tipo:"siste
 async function mutate(id,fn){
   try{const atual=await Store.getDemanda(id); if(!atual) throw {code:"gone"};
     const d=JSON.parse(JSON.stringify(atual)); fn(d); d.atualizadoEm=new Date().toISOString();
+    d.aguardaChefia=d.status==="aberta"&&!!TIPOS[d.tipo]&&etAprov(TIPOS[d.tipo].etapas[d.etapa]);
     await Store.setDemanda(id,d); return true;
   }catch(e){falha(e);return false}
 }
@@ -514,7 +649,7 @@ function montar(o){
   const prazo=o.fim?new Date(o.fim+"T12:00:00").toISOString():addDU(ini,slaDe(o.tipo)).toISOString();
   const datas=Array(n).fill(null); if(!plan) datas[0]=ini;
   return {id:cod.toLowerCase(),body:{cod,tipo:o.tipo,dim:TIPOS[o.tipo].dim,titulo:o.titulo,descricao:o.descricao,unidade:o.unidade||"",contato:o.contato||"",parceiro:o.parceiro||"",urgencia:o.urgencia||"normal",links:o.links||"",origem:o.origem||"solicitacao",
-    solicitante:S.me.id,responsavel:o.responsavel||null,criadoEm:agora,inicio:ini,prazo,etapa:0,status:plan?"planejada":"aberta",etapasDatas:datas,ativos:o.ativos||[],
+    solicitante:S.me.id,responsavel:o.responsavel||null,criadoEm:agora,inicio:ini,prazo,etapa:0,status:plan?"planejada":"aberta",etapasDatas:datas,anexos:[],aguardaChefia:false,ativos:o.ativos||[],
     historico:[{em:agora,por:S.me.id,t:plan?`Ação planejada para início em ${fmt(ini)}`:o.origem==="interna"?"Ação interna registrada pelo SPAT":"Solicitação enviada ao SPAT",tipo:"sistema"}],atualizadoEm:agora,...(o.exemplo?{exemplo:true}:{})}};
 }
 function csv(){
@@ -576,7 +711,19 @@ function bind(){
   const r=rota(); if(r.startsWith("d-")){const id=r.slice(2);
     if($("d-resp")) $("d-resp").onchange=e=>{const v=e.target.value||null;mutate(id,d=>{d.responsavel=v;d.historico.push(evento(v?`Responsável definido: ${nome(v)}`:"Responsável removido"))}).then(ok=>ok&&toast("Responsável atualizado"))};
     on("[data-act]","onclick",b=>acao(id,b.dataset.act,b));
+    on("[data-axmodo]","onclick",b=>{S.axModo=S.axModo===b.dataset.axmodo?null:b.dataset.axmodo;S.noKeep=true;render()});
+    on("[data-copiar]","onclick",b=>{const t=b.dataset.copiar;try{navigator.clipboard.writeText(t).then(()=>toast("Número copiado"),()=>toast(t))}catch(e){toast(t)}});
+    on("[data-baixar]","onclick",async b=>{const d=S.demandas.find(x=>x.id===id);const a=(d.anexos||[])[+b.dataset.baixar];b.disabled=true;try{await Store.abrirAnexo(a)}catch(e){toast(e.message||"Não foi possível baixar o arquivo.")}b.disabled=false});
+    on("[data-rmanexo]","onclick",b=>{const i=+b.dataset.rmanexo;mutate(id,x=>{const a=(x.anexos||[])[i];if(!a)return;x.anexos.splice(i,1);x.historico.push(evento(`Anexo removido: ${a.nome||a.sei||a.url}`))}).then(ok=>ok&&toast("Anexo removido"))});
+    if($("ax-file")) $("ax-file").onchange=async e=>{const fs=[...e.target.files];if(!fs.length)return;const ent=!!$("ax-ent")?.checked;toast("Enviando arquivo…");
+      try{const novos=[];for(const f of fs){const r=await Store.anexar(id,f);novos.push({tipo:"arquivo",nome:f.name,tam:f.size,...r,por:S.me.id,em:new Date().toISOString(),...(ent?{entrega:true}:{})})}
+        await mutate(id,x=>{x.anexos=[...(x.anexos||[]),...novos];x.historico.push(evento(`${novos.length===1?"Arquivo anexado":novos.length+" arquivos anexados"}: ${novos.map(n=>n.nome).join(", ")}`));respondeu(x)});toast("Arquivo anexado")}
+      catch(err){toast(err.message||"Não foi possível anexar o arquivo.")} e.target.value=""};
+    if($("fentrega")) $("fentrega").onsubmit=e=>{e.preventDefault();acao(id,"entregar",$("e-ok"))};
   }
+  on("[data-pendgo]","onclick",b=>{const t=b.dataset.pendgo;const m={"Aguardando alocação de responsável":{status:"ativas",resp:"sem"},"Aguardando sua manifestação":{status:"aguardando",resp:""},"Solicitante respondeu à pendência":{status:"aguardando",resp:""},"Prazo vencido":{status:"atrasadas",resp:isTeam()?"eu":""}}[t]||{status:"ativas",resp:""};Object.assign(S.filtro,{dim:"",tipo:"",q:""},m);location.hash="demandas"});
+  if($("tcfg-url")) $("tcfg-url").onclick=async()=>{const u=$("cfg-url").value.trim();if(!ehUrl(u)){toast("Informe um endereço que comece com https://");return}try{await Store.setConfig("sistema",{...(S.cfg.sistema||{}),url:u});toast("Endereço salvo")}catch(e){toast("Não foi possível salvar.")}};
+  if($("tcfg-email")) $("tcfg-email").onclick=async e=>{const b=e.currentTarget;b.disabled=true;try{toast(await Store.testarEmail())}catch(err){toast(err.message||"Falha no teste.")}b.disabled=false};
   // indicadores
   if($("iano")) $("iano").onchange=e=>{S.ano=+e.target.value;render()};
   if($("gmeses")){const g=S.gj;$("gmeses").onchange=e=>{g.meses=+e.target.value;render()};$("gant").onclick=()=>{g.desloc-=g.meses===12?3:Math.max(1,g.meses/3);render()};$("gprox").onclick=()=>{g.desloc+=g.meses===12?3:Math.max(1,g.meses/3);render()};$("ghoje").onclick=()=>{g.desloc=0;render()};
@@ -605,20 +752,52 @@ function bind(){
   if($("unseed")) $("unseed").onclick=async()=>{for(const d of S.demandas.filter(x=>x.exemplo)){try{await Store.delDemanda(d.id)}catch(e){}}toast("Exemplos removidos")};
 }
 
+/* resposta do solicitante a uma pendência */
+function respondeu(x){if(x.status==="aguardando"&&x.solicitante===S.me.id&&!x.respondido){x.respondido=true;x.respondidoEm=new Date().toISOString();x.historico.push(evento("Solicitante respondeu à pendência"))}}
 async function acao(id,act,btn){
   const d=S.demandas.find(x=>x.id===id); const T=TIPOS[d.tipo]; const agora=new Date().toISOString();
   const ok=m=>v=>v&&toast(m);
   if(act==="comentar"){const box=$("d-msg");const t=box.value.trim();if(!t)return;const interna=!!$("d-int")?.checked;box.value="";if($("d-int"))$("d-int").checked=false;btn.disabled=true;
-    const r=await mutate(id,x=>x.historico.push({em:agora,por:S.me.id,t,tipo:"comentario",...(interna?{interna:true}:{})}));btn.disabled=false;if(r)toast("Mensagem enviada");else if($("d-msg")&&!$("d-msg").value)$("d-msg").value=t;return}
+    const r=await mutate(id,x=>{x.historico.push({em:agora,por:S.me.id,t,tipo:"comentario",...(interna?{interna:true}:{})});if(!interna)respondeu(x)});btn.disabled=false;if(r)toast("Mensagem enviada");else if($("d-msg")&&!$("d-msg").value)$("d-msg").value=t;return}
   if(act==="iniciar") return mutate(id,x=>{x.status="aberta";x.inicio=agora;x.etapasDatas=x.etapasDatas||[];x.etapasDatas[0]=agora;if(dia(x.prazo)<=hoje())x.prazo=addDU(agora,slaDe(x.tipo)).toISOString();x.historico.push(evento(`Ação iniciada. Previsão de entrega: ${fmt(x.prazo)}`))}).then(ok("Ação iniciada"));
   if(act==="inicio"){const v=$("d-ini").value;if(!v)return;const nd=new Date(v+"T12:00:00").toISOString();return mutate(id,x=>{x.inicio=nd;if(dia(x.prazo)<dia(nd))x.prazo=addDU(nd,slaDe(x.tipo)).toISOString();x.historico.push(evento(`Início previsto ajustado para ${fmt(nd)}`))}).then(ok("Início ajustado"))}
   if(act==="assumir") return mutate(id,x=>{x.responsavel=S.me.id;x.historico.push(evento(`${nome(S.me.id)} assumiu a demanda`))}).then(ok("Demanda assumida"));
-  if(act==="avancar") return mutate(id,x=>{const ap=etAprov(T.etapas[x.etapa]);x.etapa++;x.etapasDatas=x.etapasDatas||[];x.etapasDatas[x.etapa]=agora;x.historico.push(evento(`${ap?"Aprovado pela chefia. ":""}Etapa: ${etN(T.etapas[x.etapa])}`));
-    if(x.etapa===T.etapas.length-1&&!T.fimManual){x.status="concluida";x.concluidaEm=agora;x.historico.push(evento("Demanda concluída"))}}).then(ok("Etapa atualizada"));
-  if(act==="concluir") return mutate(id,x=>{x.status="concluida";x.concluidaEm=agora;x.historico.push(evento(T.fimManual?"Instrumento assinado e registrado. Demanda concluída.":"Demanda concluída e entregue"))}).then(ok("Demanda concluída"));
+  if(act==="avancar") return mutate(id,x=>{const ap=etAprov(T.etapas[x.etapa]);x.etapa++;x.etapasDatas=x.etapasDatas||[];x.etapasDatas[x.etapa]=agora;x.historico.push(evento(`${ap?"Aprovado pela chefia. ":""}Etapa: ${etN(T.etapas[x.etapa])}`))}).then(ok("Etapa atualizada"));
+  if(act==="concluir"){S.form="entrega";S.noKeep=true;render();setTimeout(()=>{$("fentrega")?.scrollIntoView({behavior:"smooth",block:"start"});$("e-sei")?.focus()},50);return}
+  if(act==="fechar-form"){S.form=null;S.noKeep=true;render();return}
+  if(act==="entregar"){
+    const sei=$("e-sei").value.trim(), url=$("e-link").value.trim(), rot=$("e-linkrot").value.trim(), msg=$("e-msg").value.trim(), sem=$("e-sem").checked, arqs=[...($("e-arq").files||[])];
+    if(url&&!ehUrl(url)){toast("O link precisa começar com https://");return}
+    const jaTem=(d.anexos||[]).some(a=>a.entrega);
+    if(!sei&&!url&&!arqs.length&&!jaTem&&!sem){toast("Informe um processo SEI, um link ou um arquivo, ou marque Concluir sem anexo.");return}
+    if(sem&&!msg&&!sei&&!url&&!arqs.length){toast("Descreva o resultado na mensagem ao solicitante.");return}
+    btn.disabled=true;btn.textContent="Enviando…";
+    try{
+      const novos=[];
+      for(const f of arqs){const r=await Store.anexar(id,f);novos.push({tipo:"arquivo",nome:f.name,tam:f.size,...r,por:S.me.id,em:agora,entrega:true})}
+      if(url) novos.push({tipo:"link",url,nome:rot,por:S.me.id,em:agora,entrega:true});
+      const r=await mutate(id,x=>{
+        x.anexos=x.anexos||[];
+        if(sei){const s0=x.anexos.find(a=>a.tipo==="sei"&&a.sei===sei);if(s0)s0.entrega=true;else x.anexos.push({tipo:"sei",sei,nome:"",por:S.me.id,em:agora,entrega:true})}
+        x.anexos.push(...novos);
+        x.entrega={em:agora,por:S.me.id,obs:msg};
+        x.status="concluida";x.concluidaEm=agora;x.etapa=T.etapas.length-1;x.etapasDatas=x.etapasDatas||[];x.etapasDatas[x.etapa]=agora;
+        x.historico.push(evento(T.fimManual?"Instrumento assinado e registrado. Entrega disponível ao solicitante.":"Demanda concluída. Entrega disponível ao solicitante."));
+        if(msg) x.historico.push({em:agora,por:S.me.id,t:msg,tipo:"comentario",auto:true});
+      });
+      if(r){S.form=null;toast("Demanda concluída e solicitante avisado");render()} else {btn.disabled=false;btn.textContent="Concluir e avisar o solicitante"}
+    }catch(err){toast(err.message||"Não foi possível concluir.");btn.disabled=false;btn.textContent="Concluir e avisar o solicitante"}
+    return;
+  }
+  if(act==="ax-link"){const u=$("ax-url").value.trim(),n=$("ax-rot").value.trim();if(!ehUrl(u)){toast("O link precisa começar com https://");return}const ent=!!$("ax-ent")?.checked;
+    return mutate(id,x=>{x.anexos=[...(x.anexos||[]),{tipo:"link",url:u,nome:n,por:S.me.id,em:agora,...(ent?{entrega:true}:{})}];x.historico.push(evento(`Link adicionado: ${n||origemLink(u)}`));respondeu(x)}).then(v=>{if(v){S.axModo=null;S.noKeep=true;toast("Link adicionado");render()}})}
+  if(act==="ax-sei"){const n=$("ax-sei").value.trim(),r=$("ax-seirot").value.trim();if(n.length<5){toast("Informe o número do processo SEI.");return}const ent=!!$("ax-ent")?.checked;
+    return mutate(id,x=>{x.anexos=[...(x.anexos||[]),{tipo:"sei",sei:n,nome:r,por:S.me.id,em:agora,...(ent?{entrega:true}:{})}];x.historico.push(evento(`Processo SEI informado: ${n}`));respondeu(x)}).then(v=>{if(v){S.axModo=null;S.noKeep=true;toast("Processo SEI registrado");render()}})}
   if(act==="voltar") return mutate(id,x=>{x.etapa=Math.max(0,x.etapa-1);x.historico.push(evento(`Retornou para: ${etN(T.etapas[x.etapa])}`))}).then(ok("Etapa revertida"));
-  if(act==="pausar") return mutate(id,x=>{x.status="aguardando";x.pausadoEm=agora;x.historico.push(evento("Aguardando informações do solicitante. Contagem do prazo suspensa."))}).then(ok("Prazo suspenso"));
-  if(act==="retomar") return mutate(id,x=>{const n=Math.max(0,du(x.pausadoEm||agora,agora));x.status="aberta";x.prazo=addDU(x.prazo,n).toISOString();delete x.pausadoEm;x.historico.push(evento(`Atendimento retomado. Previsão estendida em ${n} d.u. para ${fmt(x.prazo)}.`))}).then(ok("Atendimento retomado"));
+  if(act==="pausar"){S.form="pausa";S.noKeep=true;render();setTimeout(()=>$("p-txt")?.focus(),30);return}
+  if(act==="pausar2"){const t=$("p-txt").value.trim();if(t.length<5){toast("Descreva o que o solicitante precisa enviar ou decidir.");return}
+    return mutate(id,x=>{x.status="aguardando";x.pausadoEm=agora;x.pendencia=t;x.respondido=false;delete x.respondidoEm;x.historico.push(evento("Aguardando manifestação do solicitante. Contagem do prazo suspensa."));x.historico.push({em:agora,por:S.me.id,t:"Pendência: "+t,tipo:"comentario",auto:true})}).then(v=>{if(v){S.form=null;toast("Prazo suspenso e solicitante avisado");render()}})}
+  if(act==="retomar") return mutate(id,x=>{const n=Math.max(0,du(x.pausadoEm||agora,agora));x.status="aberta";x.prazo=addDU(x.prazo,n).toISOString();delete x.pausadoEm;delete x.respondido;delete x.respondidoEm;x.historico.push(evento(n>0?`Atendimento retomado. Previsão estendida em ${n} d.u., para ${fmt(x.prazo)}.`:`Atendimento retomado. Previsão mantida em ${fmt(x.prazo)}.`))}).then(ok("Atendimento retomado"));
   if(act==="prazo"){const v=$("d-prazo").value;if(!v)return;const nd=new Date(v+"T12:00:00");return mutate(id,x=>{x.prazo=nd.toISOString();x.historico.push(evento(`Previsão de entrega ajustada para ${fmt(x.prazo)}`))}).then(ok("Prazo ajustado"))}
   if(act==="cancelar"){$("confcancel").innerHTML=`<div class="note" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">Cancelar esta demanda? <button class="btn sm danger" type="button">Sim, cancelar</button></div>`;$("confcancel").querySelector("button").onclick=()=>acao(id,"cancelar2");return}
   if(act==="cancelar2") return mutate(id,x=>{x.status="cancelada";x.historico.push(evento("Demanda cancelada"))}).then(ok("Demanda cancelada"));
@@ -639,6 +818,8 @@ async function seed(){
 
 /* ---------- Inicialização ---------- */
 window.addEventListener("hashchange",()=>{window.scrollTo(0,0);render()});
+document.addEventListener("click",e=>{const pn=$("notif");if(pn&&!pn.hidden&&!e.target.closest("#notif")&&!e.target.closest("#sino")){pn.hidden=true;$("sino")?.setAttribute("aria-expanded","false")}});
+document.addEventListener("keydown",e=>{if(e.key==="Escape"){const pn=$("notif");if(pn&&!pn.hidden){pn.hidden=true;$("sino")?.focus()}}});
 (async()=>{
   nav();
   let info; try{info=await Store.init()}catch(e){info={erro:"Não foi possível conectar à base",detalhe:`${e?.message||e}. ${dicaErro(e?.message)}`}} S.info=info;
@@ -647,7 +828,9 @@ window.addEventListener("hashchange",()=>{window.scrollTo(0,0);render()});
   S.me=info.me; S.readOnly=info.podeGravar===false;
   const timer=setTimeout(()=>{if(!S.loaded){S.stale=true;render()}},10000);
   Store.onPerfis(m=>{S.perfis=m;render()});
-  Store.onConfig(c=>{S.cfg=c;render()});
+  Store.onConfig(c=>{S.cfg=c;render();
+    if(Store.mode==="supabase"&&realRole()==="supervisor"&&!c.sistema?.url&&!S.urlSalva){S.urlSalva=true;Store.setConfig("sistema",{url:location.origin+location.pathname}).catch(()=>{})}});
+  if($("sino")) $("sino").onclick=abrirAvisos;
   Store.onDemandas((list,conf)=>{S.demandas=list.filter(d=>TIPOS[d.tipo]);if(conf){S.loaded=true;S.stale=false;clearTimeout(timer)}else if(!S.loaded)S.loaded=true;render()},
     ()=>{clearTimeout(timer);S.stale=true;S.loaded=true;render()});
   render();
