@@ -323,11 +323,14 @@ function formPausa(){
 /* ---------- Central de avisos ---------- */
 const lidoKey=()=>`spat-lido-${S.me?.id}`;
 function lido(){try{const v=localStorage.getItem(lidoKey());if(v)return v}catch(e){}return S.lidoMem||new Date(Date.now()-7*864e5).toISOString()}
-function marcarLido(){const v=new Date().toISOString();S.lidoMem=v;try{localStorage.setItem(lidoKey(),v)}catch(e){}}
+const vistasKey=()=>`spat-vistas-${S.me?.id}`;
+function vistas(){try{const v=localStorage.getItem(vistasKey());if(v)return new Set(JSON.parse(v))}catch(e){}return new Set(S.vistasMem||[])}
+function marcarLido(){const A0=avisos();let v=new Date().toISOString();A0.nov.forEach(x=>{if(x.h.em>v)v=x.h.em});S.lidoMem=v;try{localStorage.setItem(lidoKey(),v)}catch(e){}
+  const chaves=A0.pend.map(p=>p.chave);S.vistasMem=chaves;try{localStorage.setItem(vistasKey(),JSON.stringify(chaves))}catch(e){}}
 function avisos(){
   const pend=[],nov=[]; if(!S.me||!role()) return {pend,nov,novos:0};
   const me=S.me.id, sol=role()==="solicitante";
-  const P=(d,t,k)=>pend.push({d,t,k});
+  const V=vistas(); const P=(d,t,k)=>{const chave=d.id+"|"+t;pend.push({d,t,k,chave,vista:V.has(chave)})};
   for(const d of visiveis()){
     if(d.status==="cancelada") continue;
     if(d.solicitante===me&&d.origem!=="interna"&&d.status==="aguardando"&&!d.respondido) P(d,"Aguardando sua manifestação","warn");
@@ -342,13 +345,13 @@ function avisos(){
     for(const h of (d.historico||[])){ if(h.por===me) continue; if(h.interna&&sol) continue; nov.push({d,h}); }
   }
   nov.sort((a,b)=>a.h.em<b.h.em?1:-1);
-  const L=lido(); const novos=nov.filter(n=>n.h.em>L).length;
+  const L=lido(); const novos=nov.filter(n=>n.h.em>L).length+pend.filter(p=>!p.vista).length;
   return {pend,nov:nov.slice(0,25),novos,L};
 }
 function renderSino(){
   const b=$("sino"); if(!b) return;
   if(!S.me||!role()){b.hidden=true;return}
-  const A=avisos(); const n=A.pend.length+A.novos; b.hidden=false;
+  const A=avisos(); const n=A.novos; b.hidden=false;
   b.querySelector(".badge").textContent=n>99?"99+":String(n); b.querySelector(".badge").hidden=!n;
   b.setAttribute("aria-label",`Notificações: ${n}`);
   try{document.title=(n?`(${n}) `:"")+"Gestão SPAT"}catch(e){}
@@ -362,11 +365,11 @@ function renderSino(){
   const pn=$("notif"); if(pn&&!pn.hidden) pn.innerHTML=painelAvisos(A);
 }
 function painelAvisos(A){
-  const pend=A.pend.map(p=>`<a class="nt-i" href="#d-${esc(p.d.id)}"><span class="pill ${p.k}">${esc(p.t)}</span><b>${esc(p.d.titulo)}</b><small class="mono">${esc(p.d.cod)}</small></a>`).join("");
+  const pend=A.pend.map(p=>`<a class="nt-i${p.vista?"":" novo"}" href="#d-${esc(p.d.id)}"><span class="pill ${p.k}">${esc(p.t)}</span><b>${esc(p.d.titulo)}</b><small class="mono">${esc(p.d.cod)}</small></a>`).join("");
   const nov=A.nov.map(x=>`<a class="nt-i ${x.h.em>A.L?"novo":""}" href="#d-${esc(x.d.id)}"><b>${esc(x.d.titulo)}</b><span class="nt-t">${esc((x.h.tipo==="comentario"?nome(x.h.por)+": ":"")+x.h.t).slice(0,160)}</span><small>${fmtH(x.h.em)}</small></a>`).join("");
   const alerta=Store.mode==="supabase"&&"Notification" in window&&Notification.permission==="default"?`<button class="btn sm" id="nt-alerta">Ativar alertas no navegador</button>`:"";
-  return `<div class="nt-h"><b>Notificações</b><button class="btn sm" id="nt-lidas">Marcar como lidas</button></div>
-   <div class="nt-sec">Pendências <span>${A.pend.length}</span></div>${pend||`<p class="nt-v">Nenhuma pendência com você.</p>`}
+  return `<div class="nt-h"><b>Notificações</b><button class="btn sm" id="nt-lidas" ${A.novos?"":"disabled"}>${A.novos?"Marcar como lidas":"Tudo lido"}</button></div>
+   <div class="nt-sec">Pendências <span>${A.pend.length}</span></div>${pend?pend+`<p class="nt-v" style="padding-top:6px">As pendências ficam na lista até serem resolvidas.</p>`:`<p class="nt-v">Nenhuma pendência com você.</p>`}
    <div class="nt-sec">Atualizações</div>${nov||`<p class="nt-v">Sem atualizações recentes.</p>`}
    <div class="nt-f">${alerta}<small>${Store.emailDisponivel?"Os avisos principais também chegam por e-mail, quando configurado pelo SPAT.":"Os avisos aparecem aqui sempre que você abrir o sistema."}</small></div>`;
 }
@@ -375,7 +378,7 @@ function abrirAvisos(){
   if(!pn.hidden){pn.hidden=true;b.setAttribute("aria-expanded","false");return}
   pn.innerHTML=painelAvisos(avisos()); pn.hidden=false; b.setAttribute("aria-expanded","true");
   pn.onclick=e=>{const a=e.target.closest("a.nt-i");if(a){pn.hidden=true;b.setAttribute("aria-expanded","false")}
-    if(e.target.id==="nt-lidas"){marcarLido();renderSino();render()}
+    if(e.target.id==="nt-lidas"){marcarLido();renderSino();render();toast("Notificações marcadas como lidas")}
     if(e.target.id==="nt-alerta"){Notification.requestPermission().then(()=>{pn.innerHTML=painelAvisos(avisos())})}};
 }
 function bannerPendencias(){
