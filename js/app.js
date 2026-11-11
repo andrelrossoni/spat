@@ -84,6 +84,7 @@ function nav(){
     if(seesAll()) items.push(["#","Gestão"],["indicadores","Indicadores"],["impactos","Carteira de impactos"]);
     if(isSup()){const pend=Object.values(S.perfis).filter(p=>p.status==="pendente").length;items.push(["cadastros","Cadastros",pend||null],["config","Configurações"])}
   }
+  if(S.precisaLogin)items.push(["inicio","Entrar no sistema"]);
   if(S.me||S.precisaLogin){items.push(["#","Sistema"],["sobre","Sobre e privacidade"]);if(S.me&&Store.meusDados)items.push(["meus-dados","Meus dados"])}
   $("nav").innerHTML=items.map(([h,t,c])=>h==="#"?`<div class="grp">${t}</div>`:`<a href="#${h}" class="${r===h||(h==="demandas"&&r.startsWith("d-"))?"on":""}">${t}${c!=null?`<span class="cnt">${c}</span>`:""}</a>`).join("");
   const rr=realRole();
@@ -166,6 +167,7 @@ function telaCadastro(){
 const VERSAO_TERMOS="1.0";
 const DATA_TERMOS="novembro de 2026";
 const SC=()=>window.SPAT_CONFIG||{};
+function voltarPub(){return `<p style="margin:0 0 14px"><a href="#inicio" class="btn sm">← ${S.precisaLogin?"Voltar para a entrada":"Voltar ao início"}</a></p>`}
 function rodapeInst(){
   return `<div class="rodape-inst"><a href="https://www.embrapa.br/fale-conosco/sac" target="_blank" rel="noopener">SAC Embrapa</a><a href="https://www.embrapa.br" target="_blank" rel="noopener">Portal Embrapa</a><a href="#privacidade">Aviso de Privacidade</a><a href="#termos">Termos de Uso</a>
   <span>© ${new Date().getFullYear()} Empresa Brasileira de Pesquisa Agropecuária (Embrapa). Todos os direitos reservados.<br>Embrapa Agrossilvipastoril · Ministério da Agricultura e Pecuária · Governo Federal</span></div>`;
@@ -173,7 +175,7 @@ function rodapeInst(){
 function telaSobre(){
   const c=SC(); const est=c.estagio; const teste=["alpha","beta","development"].includes(est);
   const logo=(window.MARCA&&MARCA.cor)||Store.logoPadrao||"";
-  return `<div class="sobre"><div class="sobre-marca">${logo?`<img src="${esc(logo)}" alt="Embrapa">`:""}</div>
+  return `<div class="sobre">${voltarPub()}<div class="sobre-marca">${logo?`<img src="${esc(logo)}" alt="Embrapa">`:""}</div>
   <h1>Sistema de Gestão do SPAT</h1>
   <p class="muted">Setor de Prospecção e Avaliação de Tecnologias · Embrapa Agrossilvipastoril</p>
   ${teste?`<div class="aviso-dem"><b>Versão ${est==="beta"?"Beta":est==="alpha"?"Alfa":"de desenvolvimento"}, em teste</b>Esta versão está em validação (nível de maturidade TRL ${est==="beta"?"7, protótipo em ambiente operacional":"6, protótipo em ambiente relevante"}). Pode haver falhas e mudanças sem aviso prévio, e o suporte é prestado pelo SPAT em horário de expediente. Relate problemas ao setor.</div>`:""}
@@ -189,7 +191,7 @@ function telaSobre(){
   ${rodapeInst()}</div>`;
 }
 function telaPrivacidade(){
-  return `<div class="doc-legal"><h1>Aviso de Privacidade</h1><p class="muted">Sistema de Gestão do SPAT · versão ${VERSAO_TERMOS}, ${DATA_TERMOS}</p>
+  return `<div class="doc-legal">${voltarPub()}<h1>Aviso de Privacidade</h1><p class="muted">Sistema de Gestão do SPAT · versão ${VERSAO_TERMOS}, ${DATA_TERMOS}</p>
   <h2>1. Quem somos</h2><p>O Sistema de Gestão do SPAT é mantido pelo Setor de Prospecção e Avaliação de Tecnologias da Embrapa Agrossilvipastoril, Unidade da Empresa Brasileira de Pesquisa Agropecuária (Embrapa), empresa pública vinculada ao Ministério da Agricultura e Pecuária. A Embrapa atua como controladora dos dados pessoais tratados neste sistema, nos termos da Lei nº 13.709/2018 (Lei Geral de Proteção de Dados Pessoais, LGPD).</p>
   <h2>2. Dados pessoais que tratamos</h2><ul>
    <li><b>Conta de acesso:</b> e-mail e senha (guardada de forma cifrada, sem possibilidade de leitura).</li>
@@ -210,7 +212,7 @@ function telaPrivacidade(){
   ${rodapeInst()}</div>`;
 }
 function telaTermos(){
-  return `<div class="doc-legal"><h1>Termos de Uso</h1><p class="muted">Sistema de Gestão do SPAT · versão ${VERSAO_TERMOS}, ${DATA_TERMOS}</p>
+  return `<div class="doc-legal">${voltarPub()}<h1>Termos de Uso</h1><p class="muted">Sistema de Gestão do SPAT · versão ${VERSAO_TERMOS}, ${DATA_TERMOS}</p>
   <h2>1. Objeto</h2><p>O Sistema de Gestão do SPAT é a ferramenta institucional da Embrapa Agrossilvipastoril para pedir e acompanhar serviços do Setor de Prospecção e Avaliação de Tecnologias, como prospecção tecnológica, pareceres de propriedade intelectual, instrumentos contratuais, qualificação de ativos e avaliação de impactos.</p>
   <h2>2. Acesso</h2><p>O acesso exige conta pessoal e intransferível e cadastro validado pelo supervisor do SPAT. O perfil concedido (solicitante, membro da equipe, supervisor ou chefia) define o que cada pessoa vê e pode fazer.</p>
   <h2>3. Responsabilidades de quem usa</h2><ul><li>Manter a senha em sigilo e encerrar a sessão em computadores compartilhados.</li><li>Informar dados verdadeiros e mantê-los atualizados.</li><li>Registrar apenas informações necessárias ao serviço. Documentos com restrição de acesso devem tramitar pelo SEI; no sistema, informe o número do processo.</li><li>Não anexar arquivos com vírus, conteúdo ilícito ou de terceiros sem autorização.</li><li>Respeitar o Código de Ética da Embrapa, a Política de Segurança da Informação e as normas de propriedade intelectual da empresa.</li></ul>
