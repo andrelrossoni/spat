@@ -299,3 +299,19 @@ a.g-row:hover{background:var(--sunk)}
 @media (max-width:980px){.kpis.k5{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .panel.perigo{border-color:var(--bad)}
 .panel.perigo h2{color:var(--bad)}
+
+/* ---------- Selo de maturidade, Sobre e documentos legais ---------- */
+.selo{align-self:center;background:var(--azul);color:var(--azul-ink);font-weight:700;font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;padding:4px 10px;border-radius:999px;text-decoration:none;white-space:nowrap}
+.selo:hover{filter:brightness(1.12)}
+.sobre,.doc-legal{max-width:760px;margin:0 auto}
+.sobre-marca{display:flex;justify-content:center;padding:8px 0 18px}
+.sobre-marca img{height:64px;width:auto;background:#fff;padding:10px 14px;border-radius:8px}
+.sobre h1{text-align:center;margin:0}
+.sobre>.muted{text-align:center;margin:6px 0 18px}
+.doc-legal h1{margin:0}
+.doc-legal h2{font-size:1.02rem;margin:22px 0 6px}
+.doc-legal p,.doc-legal li{line-height:1.6;font-size:.94rem}
+.doc-legal ul{padding-left:20px;margin:6px 0}
+.rodape-inst{display:flex;flex-wrap:wrap;gap:6px 18px;align-items:center;border-top:1px solid var(--line);margin-top:28px;padding-top:14px;font-size:.82rem}
+.rodape-inst span{flex-basis:100%;color:var(--muted);line-height:1.5}
+.aceite a{text-decoration:underline}

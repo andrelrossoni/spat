@@ -84,6 +84,7 @@ function nav(){
     if(seesAll()) items.push(["#","Gestão"],["indicadores","Indicadores"],["impactos","Carteira de impactos"]);
     if(isSup()){const pend=Object.values(S.perfis).filter(p=>p.status==="pendente").length;items.push(["cadastros","Cadastros",pend||null],["config","Configurações"])}
   }
+  if(S.me||S.precisaLogin){items.push(["#","Sistema"],["sobre","Sobre e privacidade"]);if(S.me&&Store.meusDados)items.push(["meus-dados","Meus dados"])}
   $("nav").innerHTML=items.map(([h,t,c])=>h==="#"?`<div class="grp">${t}</div>`:`<a href="#${h}" class="${r===h||(h==="demandas"&&r.startsWith("d-"))?"on":""}">${t}${c!=null?`<span class="cnt">${c}</span>`:""}</a>`).join("");
   const rr=realRole();
   $("who").innerHTML = S.me?`<div class="row">${avatarHtml(S.me.id).replace('class="av"','class="av" style="background:rgba(255,255,255,.2);color:inherit;width:30px;height:30px;border-radius:50%;display:grid;place-items:center"')}<span class="nm">${esc(nome(S.me.id))}<br><span style="opacity:.75">${rr?ROLES_CURTO[rr]:"Cadastro pendente"}</span></span></div>`+
@@ -91,6 +92,9 @@ function nav(){
    (Store.auth?`<button id="sair">Sair</button>`:""):"";
   const va=$("viewas"); if(va) va.onchange=()=>{S.viewAs = va.value==="supervisor"?null:va.value; render()};
   if($("sair")) $("sair").onclick=()=>Store.auth.sair();
+  // selo de maturidade (ativos digitais em teste: orientação Embrapa I/O)
+  const est=(window.SPAT_CONFIG||{}).estagio; const sel=$("selo");
+  if(sel){const b=["alpha","beta","development"].includes(est);sel.hidden=!b;if(b)sel.textContent=est==="beta"?"Beta":est==="alpha"?"Alfa":"Desenvolvimento"}
   // assinatura
   const logo=S.cfg.marca?.logo||(window.MARCA&&MARCA.cor)||Store.logoPadrao;
   $("assin").innerHTML = logo?`<img src="${esc(logo)}" alt="Embrapa" onerror="this.outerHTML='<span class=&quot;sem-logo&quot;>Embrapa</span>'"><span class="fio"></span><span class="unid">Agrossilvipastoril</span>`:`<span class="sem-logo">Embrapa</span><span class="fio"></span><span class="unid">Agrossilvipastoril</span>`;
@@ -129,8 +133,10 @@ function telaLogin(){
    <form id="fauth" style="display:flex;flex-direction:column;gap:12px">
     <div class="fld"><label for="a-email">E-mail</label><input id="a-email" type="email" required autocomplete="email" placeholder="nome.sobrenome@embrapa.br"></div>
     ${t!=="senha"?`<div class="fld"><label for="a-senha">Senha</label><input id="a-senha" type="password" required minlength="8" autocomplete="${t==="criar"?"new-password":"current-password"}">${t==="criar"?"<small>Mínimo de 8 caracteres. Depois de confirmar o e-mail, você preenche o cadastro e aguarda a validação do supervisor.</small>":""}</div>`:""}
+    ${t==="criar"&&(window.SPAT_CONFIG||{}).dominios?.length?`<small class="muted">Use seu e-mail institucional (${esc(SPAT_CONFIG.dominios.map(d=>"@"+d).join(", "))}).</small>`:""}
     <button class="btn pri" style="align-self:flex-start">${t==="entrar"?"Entrar":t==="criar"?"Criar conta":"Enviar link de redefinição"}</button>
-   </form></div></div>`;
+   </form></div>
+   <p class="note" style="margin:0">Ao usar o sistema, você declara estar ciente do <a href="#privacidade">Aviso de Privacidade</a> e dos <a href="#termos">Termos de Uso</a>. <a href="#sobre">Sobre o sistema</a>.</p></div>`;
 }
 function telaCadastro(){
   const p=meuPerfil();
@@ -151,8 +157,81 @@ function telaCadastro(){
     <div class="fld"><label for="c-ramal">Telefone ou ramal</label><input id="c-ramal" value="${esc(v.ramal||"")}"></div>
     <div class="fld"><label for="c-papel">Perfil solicitado</label><select id="c-papel">${Object.entries(ROLES).map(([k,t])=>`<option value="${k}" ${(v.papelSolicitado||"solicitante")===k?"selected":""}>${t}</option>`).join("")}</select></div>
     <div class="fld full"><label for="c-just">Justificativa (obrigatória para perfis da equipe e da chefia)</label><textarea id="c-just" style="min-height:70px">${esc(v.justificativa||"")}</textarea></div>
+    ${p?"":`<div class="fld full aceite"><label style="flex-direction:row;display:flex;gap:10px;align-items:flex-start;font-weight:400"><input type="checkbox" id="c-aceite" required style="margin-top:4px"> <span>Li e concordo com o <a href="#privacidade" target="_blank" rel="noopener">Aviso de Privacidade</a> e com os <a href="#termos" target="_blank" rel="noopener">Termos de Uso</a> do Sistema de Gestão do SPAT. Estou ciente de que meus dados de cadastro serão usados para identificar quem pede e quem atende cada serviço.</span></label></div>`}
     <div class="fld full" style="flex-direction:row;justify-content:flex-end"><button class="btn pri" ${S.readOnly?"disabled":""}>Enviar cadastro</button></div>
   </form></div>`;
+}
+
+/* ---------- Sobre, privacidade e termos (LGPD e identidade visual Embrapa) ---------- */
+const VERSAO_TERMOS="1.0";
+const DATA_TERMOS="novembro de 2026";
+const SC=()=>window.SPAT_CONFIG||{};
+function rodapeInst(){
+  return `<div class="rodape-inst"><a href="https://www.embrapa.br/fale-conosco/sac" target="_blank" rel="noopener">SAC Embrapa</a><a href="https://www.embrapa.br" target="_blank" rel="noopener">Portal Embrapa</a><a href="#privacidade">Aviso de Privacidade</a><a href="#termos">Termos de Uso</a>
+  <span>© ${new Date().getFullYear()} Empresa Brasileira de Pesquisa Agropecuária (Embrapa). Todos os direitos reservados.<br>Embrapa Agrossilvipastoril · Ministério da Agricultura e Pecuária · Governo Federal</span></div>`;
+}
+function telaSobre(){
+  const c=SC(); const est=c.estagio; const teste=["alpha","beta","development"].includes(est);
+  const logo=(window.MARCA&&MARCA.cor)||Store.logoPadrao||"";
+  return `<div class="sobre"><div class="sobre-marca">${logo?`<img src="${esc(logo)}" alt="Embrapa">`:""}</div>
+  <h1>Sistema de Gestão do SPAT</h1>
+  <p class="muted">Setor de Prospecção e Avaliação de Tecnologias · Embrapa Agrossilvipastoril</p>
+  ${teste?`<div class="aviso-dem"><b>Versão ${est==="beta"?"Beta":est==="alpha"?"Alfa":"de desenvolvimento"}, em teste</b>Esta versão está em validação (nível de maturidade TRL ${est==="beta"?"7, protótipo em ambiente operacional":"6, protótipo em ambiente relevante"}). Pode haver falhas e mudanças sem aviso prévio, e o suporte é prestado pelo SPAT em horário de expediente. Relate problemas ao setor.</div>`:""}
+  <div class="panel"><dl class="kv">
+   <dt>Finalidade</dt><dd>Registrar as solicitações de serviço ao SPAT, acompanhar prazos e etapas, organizar as ações planejadas pelo setor e calcular os indicadores por dimensão de atuação.</dd>
+   <dt>Versão</dt><dd class="mono">${esc(c.versao||"—")}${est?` · ${esc(est)}`:""}</dd>
+   <dt>Responsável</dt><dd>Setor de Prospecção e Avaliação de Tecnologias (SPAT), Embrapa Agrossilvipastoril, Sinop (MT)</dd>
+   ${c.contato?`<dt>Contato</dt><dd><span class="mono">${esc(c.contato)}</span></dd>`:""}
+   <dt>Acesso</dt><dd>Restrito a empregados da Embrapa e a parceiros autorizados pelo SPAT</dd>
+   <dt>Hospedagem</dt><dd>${Store.mode==="api"?"Infraestrutura da Embrapa (plataforma Embrapa I/O ou servidor da Unidade)":Store.mode==="supabase"?"Serviço de banco de dados em nuvem configurado pela Unidade":"claude.ai"}</dd>
+   <dt>Direitos</dt><dd>Software de titularidade da Embrapa. Uso, cópia e distribuição sujeitos à Política de Propriedade Intelectual da Embrapa.</dd>
+  </dl></div>
+  ${rodapeInst()}</div>`;
+}
+function telaPrivacidade(){
+  return `<div class="doc-legal"><h1>Aviso de Privacidade</h1><p class="muted">Sistema de Gestão do SPAT · versão ${VERSAO_TERMOS}, ${DATA_TERMOS}</p>
+  <h2>1. Quem somos</h2><p>O Sistema de Gestão do SPAT é mantido pelo Setor de Prospecção e Avaliação de Tecnologias da Embrapa Agrossilvipastoril, Unidade da Empresa Brasileira de Pesquisa Agropecuária (Embrapa), empresa pública vinculada ao Ministério da Agricultura e Pecuária. A Embrapa atua como controladora dos dados pessoais tratados neste sistema, nos termos da Lei nº 13.709/2018 (Lei Geral de Proteção de Dados Pessoais, LGPD).</p>
+  <h2>2. Dados pessoais que tratamos</h2><ul>
+   <li><b>Conta de acesso:</b> e-mail e senha (guardada de forma cifrada, sem possibilidade de leitura).</li>
+   <li><b>Cadastro:</b> nome, e-mail institucional, matrícula (para empregados), unidade ou setor, cargo, telefone ou ramal e a justificativa do perfil pedido.</li>
+   <li><b>Uso do serviço:</b> as solicitações que você registra, mensagens, anexos e o histórico de cada demanda, com data, hora e autor de cada ação.</li>
+   <li><b>Registros técnicos:</b> data e hora de acesso, endereço IP e eventos de segurança (entrada, alteração de perfis, exclusões), guardados para a proteção do sistema.</li>
+   <li><b>Estatísticas de uso:</b> páginas visitadas, sem cookies de rastreamento, pela ferramenta Matomo da própria Embrapa (hit.embrapa.io).</li></ul>
+  <p>O sistema não pede dados pessoais sensíveis. Não registre, nas descrições e mensagens, dados sensíveis ou informações sigilosas que não sejam necessários ao serviço.</p>
+  <h2>3. Para que usamos</h2><ul><li>Identificar quem pede e quem atende cada serviço e controlar o acesso conforme o perfil.</li><li>Conduzir as demandas, cumprir prazos e enviar avisos por e-mail sobre o andamento.</li><li>Produzir indicadores de gestão do SPAT, sempre de forma agregada.</li><li>Garantir a segurança, investigar incidentes e corrigir falhas.</li></ul>
+  <p>O tratamento se fundamenta na execução das atribuições legais da Embrapa e de suas políticas institucionais (art. 7º, inciso III, e art. 23 da LGPD) e, no cadastro, na ciência e concordância que você manifesta ao aceitar este aviso.</p>
+  <h2>4. Com quem compartilhamos</h2><p>Os dados ficam em infraestrutura da Embrapa e são vistos apenas por quem precisa deles: a equipe do SPAT e as chefias veem as demandas e os dados de contato; os solicitantes veem apenas as próprias demandas e o nome de quem as atende. Não vendemos nem cedemos dados pessoais. O compartilhamento com outros órgãos ocorre apenas por obrigação legal ou ordem judicial.</p>
+  <h2>5. Por quanto tempo guardamos</h2><p>Os dados de cadastro ficam guardados enquanto a conta existir. As demandas são registros institucionais de gestão da Embrapa e seguem os prazos de guarda de documentos da empresa; se a conta for excluída, o seu nome deixa de aparecer, mas o histórico das demandas é mantido sem o seu cadastro (art. 16 da LGPD).</p>
+  <h2>6. Seus direitos</h2><p>Você pode, a qualquer momento: confirmar se tratamos seus dados e acessá-los; corrigir dados incompletos ou desatualizados (pela tela de cadastro); obter uma cópia dos seus dados (pela opção <b>Meus dados</b>); pedir a exclusão da sua conta (também em <b>Meus dados</b>); e obter informações sobre o compartilhamento.</p>
+  <h2>7. Segurança</h2><p>Usamos conexão cifrada (HTTPS), senhas protegidas por algoritmo de derivação de chave, sessões com expiração, controle de acesso por perfil, trilha de auditoria e cópias de segurança diárias na infraestrutura da Embrapa.</p>
+  <h2>8. Cookies</h2><p>O sistema usa apenas um cookie essencial de sessão, que mantém você conectado. A estatística de uso não grava cookies.</p>
+  <h2>9. Encarregado e contato</h2><p>Dúvidas e pedidos sobre dados pessoais podem ser enviados ao Encarregado pelo Tratamento de Dados Pessoais da Embrapa pela Plataforma Integrada de Ouvidoria e Acesso à Informação (<a href="https://falabr.cgu.gov.br" target="_blank" rel="noopener">Fala.BR</a>)${SC().contato?`, ou ao SPAT pelo e-mail <span class="mono">${esc(SC().contato)}</span>`:""}.</p>
+  <h2>10. Mudanças neste aviso</h2><p>Este aviso pode ser atualizado. A versão vigente fica sempre disponível nesta página, com a data de atualização.</p>
+  ${rodapeInst()}</div>`;
+}
+function telaTermos(){
+  return `<div class="doc-legal"><h1>Termos de Uso</h1><p class="muted">Sistema de Gestão do SPAT · versão ${VERSAO_TERMOS}, ${DATA_TERMOS}</p>
+  <h2>1. Objeto</h2><p>O Sistema de Gestão do SPAT é a ferramenta institucional da Embrapa Agrossilvipastoril para pedir e acompanhar serviços do Setor de Prospecção e Avaliação de Tecnologias, como prospecção tecnológica, pareceres de propriedade intelectual, instrumentos contratuais, qualificação de ativos e avaliação de impactos.</p>
+  <h2>2. Acesso</h2><p>O acesso exige conta pessoal e intransferível e cadastro validado pelo supervisor do SPAT. O perfil concedido (solicitante, membro da equipe, supervisor ou chefia) define o que cada pessoa vê e pode fazer.</p>
+  <h2>3. Responsabilidades de quem usa</h2><ul><li>Manter a senha em sigilo e encerrar a sessão em computadores compartilhados.</li><li>Informar dados verdadeiros e mantê-los atualizados.</li><li>Registrar apenas informações necessárias ao serviço. Documentos com restrição de acesso devem tramitar pelo SEI; no sistema, informe o número do processo.</li><li>Não anexar arquivos com vírus, conteúdo ilícito ou de terceiros sem autorização.</li><li>Respeitar o Código de Ética da Embrapa, a Política de Segurança da Informação e as normas de propriedade intelectual da empresa.</li></ul>
+  <h2>4. Responsabilidades do SPAT</h2><p>O SPAT conduz as demandas conforme as prioridades e os prazos de referência publicados no catálogo de serviços, que podem ser ajustados por escopo ou dependências externas, sempre com registro no histórico.</p>
+  <h2>5. Disponibilidade</h2><p>O sistema pode passar por manutenções e interrupções. Versões identificadas como Alfa ou Beta estão em teste e podem apresentar falhas.</p>
+  <h2>6. Propriedade intelectual</h2><p>O software e seus conteúdos pertencem à Embrapa. As informações registradas nas demandas são de uso interno e podem conter informação tecnológica protegida; não as divulgue sem autorização.</p>
+  <h2>7. Suspensão de acesso</h2><p>O supervisor do SPAT pode desativar contas em caso de uso indevido, desligamento ou fim da parceria.</p>
+  <h2>8. Legislação</h2><p>Aplicam-se a Lei nº 13.709/2018 (LGPD), a Lei nº 12.527/2011 (Lei de Acesso à Informação), a Lei nº 9.609/1998 (Lei de Software) e as normas internas da Embrapa.</p>
+  ${rodapeInst()}</div>`;
+}
+function telaMeusDados(){
+  if(!Store.meusDados) return vazio("Recurso indisponível nesta instalação","");
+  const p=meuPerfil()||{};
+  return `<div class="head"><div><h1>Meus dados</h1><p>Direitos do titular de dados pessoais (LGPD, art. 18).</p></div></div>
+  <div class="grid2"><div class="panel"><div class="sec-t"><h2>Cópia dos meus dados</h2></div>
+   <p class="muted" style="margin:0 0 12px;font-size:.9rem">Gera um arquivo com sua conta, seu cadastro, as demandas que você pediu e os avisos que recebeu.</p>
+   <dl class="kv"><dt>Nome</dt><dd>${esc(p.nome||"—")}</dd><dt>E-mail</dt><dd>${esc(p.email||S.me?.email||"—")}</dd><dt>Setor</dt><dd>${esc(p.setor||"—")}</dd></dl>
+   <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><button class="btn pri" id="md-baixar">Baixar meus dados</button></div></div>
+  <div class="panel perigo"><div class="sec-t"><h2>Excluir minha conta</h2></div>
+   <p class="muted" style="margin:0 0 12px;font-size:.9rem">Apaga sua conta e seu cadastro. As demandas que você pediu continuam no sistema como registro institucional, sem o seu nome. Não há como desfazer.</p>
+   <div style="display:flex;gap:8px;flex-wrap:wrap"><input class="inp" id="md-conf" placeholder="Digite EXCLUIR" aria-label="Confirmação" style="flex:1;min-width:140px"><button class="btn danger" id="md-excluir">Excluir minha conta</button></div></div></div>`;
 }
 
 /* ---------- Telas: início ---------- */
@@ -357,7 +436,7 @@ function renderSino(){
   try{document.title=(n?`(${n}) `:"")+"Gestão SPAT"}catch(e){}
   // alerta do navegador para itens novos (instalação própria)
   const chaves=new Set([...A.pend.map(p=>p.d.id+p.t),...A.nov.filter(x=>x.h.em>A.L).map(x=>x.d.id+x.h.em)]);
-  if(S.chavesAviso&&Store.mode==="supabase"&&"Notification" in window&&Notification.permission==="granted"){
+  if(S.chavesAviso&&Store.mode!=="claude"&&"Notification" in window&&Notification.permission==="granted"){
     const novas=[...A.pend.filter(p=>!S.chavesAviso.has(p.d.id+p.t)).map(p=>[p.t,p.d.titulo]),...A.nov.filter(x=>x.h.em>A.L&&!S.chavesAviso.has(x.d.id+x.h.em)).map(x=>[x.h.t,x.d.titulo])];
     novas.slice(0,3).forEach(([t,c])=>{try{new Notification("SPAT: "+t.slice(0,80),{body:c})}catch(e){}});
   }
@@ -367,7 +446,7 @@ function renderSino(){
 function painelAvisos(A){
   const pend=A.pend.map(p=>`<a class="nt-i${p.vista?"":" novo"}" href="#d-${esc(p.d.id)}"><span class="pill ${p.k}">${esc(p.t)}</span><b>${esc(p.d.titulo)}</b><small class="mono">${esc(p.d.cod)}</small></a>`).join("");
   const nov=A.nov.map(x=>`<a class="nt-i ${x.h.em>A.L?"novo":""}" href="#d-${esc(x.d.id)}"><b>${esc(x.d.titulo)}</b><span class="nt-t">${esc((x.h.tipo==="comentario"?nome(x.h.por)+": ":"")+x.h.t).slice(0,160)}</span><small>${fmtH(x.h.em)}</small></a>`).join("");
-  const alerta=Store.mode==="supabase"&&"Notification" in window&&Notification.permission==="default"?`<button class="btn sm" id="nt-alerta">Ativar alertas no navegador</button>`:"";
+  const alerta=Store.mode!=="claude"&&"Notification" in window&&Notification.permission==="default"?`<button class="btn sm" id="nt-alerta">Ativar alertas no navegador</button>`:"";
   return `<div class="nt-h"><b>Notificações</b><button class="btn sm" id="nt-lidas" ${A.novos?"":"disabled"}>${A.novos?"Marcar como lidas":"Tudo lido"}</button></div>
    <div class="nt-sec">Pendências <span>${A.pend.length}</span></div>${pend?pend+`<p class="nt-v" style="padding-top:6px">As pendências ficam na lista até serem resolvidas.</p>`:`<p class="nt-v">Nenhuma pendência com você.</p>`}
    <div class="nt-sec">Atualizações</div>${nov||`<p class="nt-v">Sem atualizações recentes.</p>`}
@@ -614,6 +693,7 @@ function telaConfig(){
 
 /* ---------- Diagnóstico de conexão ---------- */
 function dicaErro(m){m=String(m||"");
+  if(Store.mode==="api"){if(/fetch|network|Failed to/i.test(m)) return "O navegador não alcançou o servidor do sistema. Confira a conexão com a rede da Embrapa e tente de novo.";return "Envie esta mensagem ao administrador do sistema (Núcleo de TI ou SPAT).";}
   if(/does not exist|schema cache|relation|42P01|PGRST205/i.test(m)) return "As tabelas não foram encontradas no banco. No Supabase, abra SQL Editor, cole todo o arquivo supabase/schema.sql e clique em Run.";
   if(/api ?key|apikey|JWT|Invalid|401|unauthorized/i.test(m)) return "A chave ou a URL do config.js não foram aceitas. Confira a Project URL e a chave publicável (sb_publishable_…) em Settings → API Keys.";
   if(/permission|policy|row-level|42501/i.test(m)) return "O banco recusou a leitura pelas regras de acesso. Execute novamente o supabase/schema.sql completo.";
@@ -626,13 +706,17 @@ window.addEventListener("error",e=>{if(e.message)window.SPAT_ERRO(e.message)});
 async function render(){try{await render0()}catch(e){console.error(e);const v=$("view");if(v)v.innerHTML=`<div class="banner"><b>Erro ao exibir a tela:</b> ${esc(e.message)}</div>`}}
 async function render0(){
   const r=rota(); const v=$("view");
+  const PUB={sobre:telaSobre,privacidade:telaPrivacidade,termos:telaTermos};
+  if(PUB[r]&&(S.precisaLogin||!realRole()||!S.loaded)){nav();v.innerHTML=PUB[r]();bind();return}
   if(S.precisaLogin){nav();v.innerHTML=telaLogin();bind();return}
   if(!S.loaded && !S.stale){nav();v.innerHTML=vazio("Carregando o Sistema SPAT…","As informações aparecem assim que a conexão com a base for confirmada.");return}
   if(Store.nomes){const ids=S.demandas.flatMap(d=>[d.solicitante,d.responsavel,...(d.historico||[]).map(h=>h.por)]).concat(Object.keys(S.perfis),[S.me?.id]).filter(i=>i&&!S.prof[i]);if(ids.length)Object.assign(S.prof,await Store.nomes([...new Set(ids)]))}
   nav();
   const banner = S.stale?`<div class="banner"><b>Não foi possível confirmar a conexão com a base.</b>${S.erro?`<br>Erro: <span class="mono">${esc(S.erro)}</span><br>${esc(dicaErro(S.erro))}`:" As informações podem estar desatualizadas. Recarregue a página; se persistir, abra o console do navegador (F12) e envie o erro em vermelho ao administrador."}</div>`:"";
   let html;
-  if(!realRole()) html=telaCadastro();
+  if(PUB[r]) html=PUB[r]();
+  else if(r==="meus-dados") html=telaMeusDados();
+  else if(!realRole()) html=telaCadastro();
   else if(r.startsWith("d-")) html=telaDetalhe(r.slice(2));
   else html=({nova:telaNova,servicos:telaServicos,demandas:telaLista,cronograma:telaCronograma,indicadores:telaIndicadores,impactos:telaImpactos,cadastros:telaCadastros,config:telaConfig}[r]||telaInicio)();
   const foco=document.activeElement?.id; let pos=null; try{pos=foco&&document.activeElement.selectionStart}catch(e){}
@@ -701,9 +785,12 @@ function bind(){
     try{if(S.authTab==="entrar")await Store.auth.entrar(em,pw);else if(S.authTab==="criar"){await Store.auth.criarConta(em,pw);toast("Conta criada. Confirme o e-mail recebido e entre.");S.authTab="entrar";render()}else{await Store.auth.redefinir(em);toast("Enviamos o link de redefinição para o e-mail.")}}
     catch(err){toast(err?.message||"Não foi possível concluir. Confira e-mail e senha.")}btn.disabled=false};
   if($("editcad")) $("editcad").onclick=()=>{S.editCad=true;render()};
+  if($("md-baixar")) $("md-baixar").onclick=async e=>{const b=e.currentTarget;b.disabled=true;try{const j=await Store.meusDados();await Store.baixar(`meus-dados-spat-${new Date().toISOString().slice(0,10)}.json`,new Blob([JSON.stringify(j,null,2)],{type:"application/json"}));toast("Arquivo gerado")}catch(err){toast(err.message||"Não foi possível gerar o arquivo.")}b.disabled=false};
+  if($("md-excluir")) $("md-excluir").onclick=async e=>{if($("md-conf").value.trim()!=="EXCLUIR"){toast("Digite EXCLUIR para confirmar.");return}const b=e.currentTarget;b.disabled=true;try{await Store.excluirConta();location.hash="";location.reload()}catch(err){toast(err.message||"Não foi possível excluir a conta.");b.disabled=false}};
   if($("fcad")) $("fcad").onsubmit=async e=>{e.preventDefault();const g=id=>$(id).value.trim();
     const papel=g("c-papel");if(papel!=="solicitante"&&!g("c-just")){toast("Informe a justificativa para o perfil solicitado.");return}
-    try{await Store.salvarCadastro({nome:g("c-nome"),email:g("c-email"),matricula:g("c-mat"),setor:g("c-setor"),cargo:g("c-cargo"),ramal:g("c-ramal"),papelSolicitado:papel,justificativa:g("c-just"),criadoEm:new Date().toISOString()});S.editCad=false;toast("Cadastro enviado para validação")}catch(err){falha(err)}};
+    if($("c-aceite")&&!$("c-aceite").checked){toast("Para continuar, leia e aceite o Aviso de Privacidade e os Termos de Uso.");return}
+    try{await Store.salvarCadastro({nome:g("c-nome"),email:g("c-email"),matricula:g("c-mat"),setor:g("c-setor"),cargo:g("c-cargo"),ramal:g("c-ramal"),papelSolicitado:papel,justificativa:g("c-just"),criadoEm:new Date().toISOString(),...($("c-aceite")?{aceite:{versao:VERSAO_TERMOS}}:{})});S.editCad=false;toast("Cadastro enviado para validação")}catch(err){falha(err)}};
   // painel
   on("[data-go]","onclick",b=>{Object.assign(S.filtro,{status:b.dataset.go,dim:"",tipo:"",resp:""});location.hash="demandas"});
   document.querySelectorAll("a[data-tipo]").forEach(a=>a.addEventListener("click",()=>{S.draft=null;escolherTipo(a.dataset.tipo);if(rota()==="nova"){S.noKeep=true;render()}}));

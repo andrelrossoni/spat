@@ -1,9 +1,9 @@
 /* ===== Exportação de relatórios: Excel (.xlsx com gráficos nativos) e PowerPoint (.pptx) =====
    Recebe o objeto R montado por dadosRelatorio() no núcleo. Retorna Uint8Array. */
 const Export = (()=>{
-  const LIBS = {jszip:"https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js",pptx:"https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"};
+  const LIBS = window.SPAT_LIBS || {jszip:"https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js",pptx:"https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"};
   const load = src => new Promise((ok,err)=>{const s=document.createElement("script");s.src=src;s.onload=ok;s.onerror=()=>err(new Error("Não foi possível carregar a biblioteca de exportação."));document.head.appendChild(s)});
-  async function prep(k){ if(k==="jszip"&&!window.JSZip) await load(LIBS.jszip); if(k==="pptx"&&!window.PptxGenJS) await load(LIBS.pptx); }
+  async function prep(k){ const L=window.SPAT_LIBS||LIBS; if(k==="jszip"&&!window.JSZip) await load(L.jszip); if(k==="pptx"&&!window.PptxGenJS) await load(L.pptx); }
   const COR={azul:"29428C",verde:"00783E",verdeClaro:"7CCF9F",cinza:"A7B4B2",ink:"17233B",muted:"566377",fundo:"F2F5F4",linha:"D8E0DE",verm:"B0281F",laranja:"C9820F",azulClaro:"8FA6DD"};
   const b64 = uri => uri.split(",")[1];
   const x = s => String(s??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g,"");
