@@ -34,7 +34,7 @@ window.Store = (()=>{
     onPerfis(cb){live("perfis",async()=>{try{const rows=await all("perfis");const m={};rows.forEach(r=>m[r.id]=map(r));cb(m)}catch(e){}})},
     async getDemanda(id){const {data,error}=await sb.from("demandas").select("dados").eq("id",id).maybeSingle();err(error);return data?data.dados:null},
     async setDemanda(id,b){const {error}=await sb.from("demandas").upsert({id,dados:b,solicitante:b.solicitante,atualizado_em:new Date().toISOString()});err(error)},
-    async delDemanda(id){const {error}=await sb.from("demandas").delete().eq("id",id);err(error)},
+    async delDemanda(id){const {data,error}=await sb.from("demandas").delete().eq("id",id).select("id");err(error);if(!data||!data.length)throw {code:"42501",message:"permission"}},
     async setConfig(id,b){const {error}=await sb.from("config").upsert({id,dados:b});err(error)},
     async salvarCadastro(b){const {error}=await sb.from("perfis").upsert({id:me.id,nome:b.nome,email:b.email,matricula:b.matricula,setor:b.setor,cargo:b.cargo,ramal:b.ramal,papel_solicitado:b.papelSolicitado,justificativa:b.justificativa});err(error)},
     async definirAcesso(id,o){const u={status:o.status};if(o.papel!==undefined)u.papel=o.papel;const {error}=await sb.from("perfis").update(u).eq("id",id);err(error)},

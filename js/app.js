@@ -96,6 +96,7 @@ function nav(){
   // selo de maturidade (ativos digitais em teste: orientação Embrapa I/O)
   const est=(window.SPAT_CONFIG||{}).estagio; const sel=$("selo");
   if(sel){const b=["alpha","beta","development"].includes(est);sel.hidden=!b;if(b)sel.textContent=est==="beta"?"Beta":est==="alpha"?"Alfa":"Desenvolvimento"}
+  if($("versao")) $("versao").textContent="Versão "+versaoApp(); medirTopo();
   // assinatura
   const logo=S.cfg.marca?.logo||(window.MARCA&&MARCA.cor)||Store.logoPadrao;
   $("assin").innerHTML = logo?`<img src="${esc(logo)}" alt="Embrapa" onerror="this.outerHTML='<span class=&quot;sem-logo&quot;>Embrapa</span>'"><span class="fio"></span><span class="unid">Agrossilvipastoril</span>`:`<span class="sem-logo">Embrapa</span><span class="fio"></span><span class="unid">Agrossilvipastoril</span>`;
@@ -164,6 +165,8 @@ function telaCadastro(){
 }
 
 /* ---------- Sobre, privacidade e termos (LGPD e identidade visual Embrapa) ---------- */
+const VERSAO_APP="1.26.11"; // versão do sistema (na instalação Embrapa I/O vem de IO_VERSION)
+const versaoApp=()=>(window.SPAT_CONFIG&&SPAT_CONFIG.versao)||VERSAO_APP;
 const VERSAO_TERMOS="1.0";
 const DATA_TERMOS="novembro de 2026";
 const SC=()=>window.SPAT_CONFIG||{};
@@ -181,7 +184,7 @@ function telaSobre(){
   ${teste?`<div class="aviso-dem"><b>Versão ${est==="beta"?"Beta":est==="alpha"?"Alfa":"de desenvolvimento"}, em teste</b>Esta versão está em validação (nível de maturidade TRL ${est==="beta"?"7, protótipo em ambiente operacional":"6, protótipo em ambiente relevante"}). Pode haver falhas e mudanças sem aviso prévio, e o suporte é prestado pelo SPAT em horário de expediente. Relate problemas ao setor.</div>`:""}
   <div class="panel"><dl class="kv">
    <dt>Finalidade</dt><dd>Registrar as solicitações de serviço ao SPAT, acompanhar prazos e etapas, organizar as ações planejadas pelo setor e calcular os indicadores por dimensão de atuação.</dd>
-   <dt>Versão</dt><dd class="mono">${esc(c.versao||"—")}${est?` · ${esc(est)}`:""}</dd>
+   <dt>Versão</dt><dd class="mono">${esc(versaoApp())}${est?` · ${esc(est)}`:""}</dd>
    <dt>Responsável</dt><dd>Setor de Prospecção e Avaliação de Tecnologias (SPAT), Embrapa Agrossilvipastoril, Sinop (MT)</dd>
    ${c.contato?`<dt>Contato</dt><dd><span class="mono">${esc(c.contato)}</span></dd>`:""}
    <dt>Acesso</dt><dd>Restrito a empregados da Embrapa e a parceiros autorizados pelo SPAT</dd>
@@ -862,8 +865,10 @@ function bind(){
     try{const msg=await Store.reiniciar(S.demandas.slice(),$("rs-cfg").checked);S.demandas=[];
       try{localStorage.removeItem("spat-seen");localStorage.removeItem(vistasKey())}catch(err){}
       toast(msg||"Sistema reiniciado");location.hash="inicio"}
-    catch(err){toast(err.message||"Não foi possível reiniciar.");b.disabled=false;b.textContent="Reiniciar o sistema"}};
-  if($("unseed")) $("unseed").onclick=async()=>{for(const d of S.demandas.filter(x=>x.exemplo)){try{await Store.delDemanda(d.id)}catch(e){}}toast("Exemplos removidos")};
+    catch(err){toast(/WHERE clause/i.test(err.message||"")?"O banco precisa de uma atualização: execute no Supabase o script supabase/atualizar-correcao-reinicio-exemplos.sql e tente de novo.":(err.message||"Não foi possível reiniciar."));b.disabled=false;b.textContent="Reiniciar o sistema"}};
+  if($("unseed")) $("unseed").onclick=async e=>{const b=e.currentTarget;b.disabled=true;const ex=S.demandas.filter(x=>x.exemplo);let ok=0,erro=null;
+    for(const d of ex){try{if(Store.excluirDemanda)await Store.excluirDemanda(d.id,d);else await Store.delDemanda(d.id);ok++}catch(err){erro=err}}
+    if(!erro)toast(`${ok} exemplo(s) removido(s)`);else if(!ok)toast(Store.mode==="supabase"?"Não foi possível remover os exemplos. Execute no Supabase o script supabase/atualizar-correcao-reinicio-exemplos.sql.":"Não foi possível remover os exemplos: "+(erro.message||"erro"));else toast(`${ok} de ${ex.length} exemplo(s) removido(s).`);b.disabled=false};
 }
 
 /* resposta do solicitante a uma pendência */
@@ -940,6 +945,9 @@ async function seed(){
 
 /* ---------- Inicialização ---------- */
 window.addEventListener("hashchange",()=>{window.scrollTo(0,0);render()});
+/* cabeçalho fixo: a barra lateral e o painel de avisos começam logo abaixo dele */
+function medirTopo(){const t=document.querySelector(".topo");if(t)document.documentElement.style.setProperty("--topo-h",t.offsetHeight+"px")}
+window.addEventListener("resize",medirTopo);window.addEventListener("load",medirTopo);setTimeout(medirTopo,0);
 document.addEventListener("click",e=>{const pn=$("notif");if(pn&&!pn.hidden&&!e.target.closest("#notif")&&!e.target.closest("#sino")){pn.hidden=true;$("sino")?.setAttribute("aria-expanded","false")}});
 document.addEventListener("keydown",e=>{if(e.key==="Escape"){const pn=$("notif");if(pn&&!pn.hidden){pn.hidden=true;$("sino")?.focus()}}});
 (async()=>{
